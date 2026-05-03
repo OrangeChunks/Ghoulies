@@ -24,21 +24,27 @@ function render() {
   const top = state.discard.at(-1);
 
   /* =========================
-     DISCARD
+     DISCARD PILE
   ========================== */
   document.getElementById("discard").innerHTML = top
     ? `<img src="${file(top)}" class="card">`
     : "";
 
   /* =========================
-     STATUS (SHOW REAL CARD)
+     STATUS (🔥 FIXED HERE)
   ========================== */
-  let msg = state.message || "Choose deck or discard";
+  let msg = "Choose deck or discard";
+
+  if (me.pendingDraw) {
+    msg = `Picked up: ${me.pendingDraw}`;
+  } else if (state.message) {
+    msg = state.message;
+  }
 
   document.getElementById("status").innerText = msg;
 
   /* =========================
-     HAND (RED HIGHLIGHT IF CARD HELD)
+     HAND
   ========================== */
   document.getElementById("hand").innerHTML = me.hand
     .map((c) => {
@@ -52,7 +58,7 @@ function render() {
 }
 
 /* =========================
-   FILE MAP
+   CARD IMAGE
 ========================= */
 function file(card) {
   const v = card.slice(0, -1);
@@ -73,9 +79,7 @@ document.addEventListener("click", (e) => {
 
   const me = getMe(state);
 
-  /* =========================
-     DRAW
-  ========================== */
+  /* DRAW */
   if (e.target.id === "deck") {
     socket.emit("draw");
     return;
@@ -86,14 +90,11 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  /* =========================
-     SWAP WITH HELD CARD
-  ========================== */
+  /* SWAP */
   const card = e.target.dataset.card;
 
   if (card && me?.pendingDraw) {
     socket.emit("swap", card);
     return;
   }
-
 });
