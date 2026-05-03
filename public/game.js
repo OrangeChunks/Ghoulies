@@ -2,7 +2,7 @@ let socket = io();
 let state = null;
 let myId = null;
 
-socket.emit("join", "room1");
+socket.emit("join","room1");
 
 socket.on("you",(id)=>{
   myId = id;
@@ -19,13 +19,11 @@ function getMe(game){
 }
 
 function getOpponent(game){
-  if(!game || !myId) return null;
   return Object.values(game.players).find(p => p.id !== myId);
 }
 
 function isMyTurn(){
-  if(!state || !myId) return false;
-  return state.order[state.turn] === myId;
+  return state?.order[state.turn] === myId;
 }
 
 /* =========================
@@ -46,11 +44,7 @@ function render(){
   document.getElementById("discard").innerHTML =
     top ? `<img src="${file(top)}" class="card">` : "";
 
-  let msg = state.message || "";
-
-  if(!state.gameOver){
-    msg = isMyTurn() ? "Your turn" : "Opponent turn";
-  }
+  let msg = isMyTurn() ? "Your turn" : "Opponent turn";
 
   if(me.pendingDraw){
     msg = `Picked up: ${me.pendingDraw}`;
@@ -71,9 +65,7 @@ function render(){
   }
 }
 
-/* =========================
-   CARD IMAGE
-========================= */
+/* CARD IMAGE */
 function file(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
@@ -87,7 +79,7 @@ function file(card){
 }
 
 /* =========================
-   CLICK LOGIC
+   CLICK EVENTS
 ========================= */
 document.addEventListener("click",(e)=>{
 

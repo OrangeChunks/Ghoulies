@@ -29,7 +29,7 @@ function createDeck(){
 }
 
 /* =========================
-   SCORING (YOUR RULES)
+   SCORING
 ========================= */
 function cardValue(card){
   const v = card.slice(0,-1);
@@ -39,7 +39,7 @@ function cardValue(card){
 
   if(v === "J" || v === "Q" || v === "K"){
     if(v === "K" && (s === "♥" || s === "♦")){
-      return 0; // RED KINGS
+      return 0; // red kings
     }
     return 10;
   }
@@ -65,15 +65,14 @@ function createGame(){
     players:{},
     order:[],
     turn:0,
-    phase:"choose",
-    message:"",
     ghouliesCalled:false,
-    gameOver:false
+    gameOver:false,
+    message:""
   };
 }
 
 /* =========================
-   SOCKET
+   SOCKET LOGIC
 ========================= */
 io.on("connection",(socket)=>{
 
@@ -103,7 +102,6 @@ io.on("connection",(socket)=>{
     socket.join(roomId);
 
     socket.emit("you", socket.id);
-
     io.to(roomId).emit("state",game);
   });
 
@@ -112,7 +110,6 @@ io.on("connection",(socket)=>{
   }
 
   function nextTurn(game){
-
     game.turn = (game.turn + 1) % game.order.length;
 
     if(game.ghouliesCalled){
@@ -121,59 +118,48 @@ io.on("connection",(socket)=>{
   }
 
   function endGame(game){
-
     game.gameOver = true;
 
-    const results = Object.values(game.players).map(p => ({
+    const scores = Object.values(game.players).map(p => ({
       id: p.id,
       score: handScore(p.hand)
     }));
 
-    const loser = results.find(p => p.score >= 51);
+    const worst = scores.sort((a,b)=>b.score-a.score)[0];
 
-    if(loser){
-      game.message = `GAME OVER: Player LOST (51+)`;
-    } else {
-      const worst = results.sort((a,b)=>b.score-a.score)[0];
-      game.message = `GAME OVER: Highest score loses`;
-    }
+    game.message = `GAME OVER - Highest score loses`;
   }
 
   /* DRAW */
   socket.on("draw",()=>{
 
     const game = rooms[roomId];
-    const p = game.players[socket.id];
-
     if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
 
-    const drawn = game.deck.pop();
+    const p = game.players[socket.id];
 
-    p.pendingDraw = drawn;
-    game.phase = "resolve";
+    p.pendingDraw = game.deck.pop();
 
     game.message = "Card drawn";
 
     io.to(roomId).emit("state",game);
   });
 
-  /* DISCARD */
+  /* TAKE DISCARD */
   socket.on("takeDiscard",(card)=>{
 
     const game = rooms[roomId];
-    const p = game.players[socket.id];
-
     if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
+
+    const p = game.players[socket.id];
 
     const top = game.discard.at(-1);
     if(card !== top) return;
 
     game.discard.pop();
-
     p.pendingDraw = top;
-    game.phase = "resolve";
 
     game.message = `Picked up ${top}`;
 
@@ -184,10 +170,10 @@ io.on("connection",(socket)=>{
   socket.on("swap",(card)=>{
 
     const game = rooms[roomId];
-    const p = game.players[socket.id];
-
-    if(!p?.pendingDraw) return;
+    if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
+
+    const p = game.players[socket.id];
 
     const i = p.hand.indexOf(card);
     if(i === -1) return;
@@ -199,8 +185,6 @@ io.on("connection",(socket)=>{
 
     p.pendingDraw = null;
 
-    game.phase = "choose";
-
     nextTurn(game);
 
     io.to(roomId).emit("state",game);
@@ -210,12 +194,13 @@ io.on("connection",(socket)=>{
   socket.on("snap",(card)=>{
 
     const game = rooms[roomId];
-    const p = game.players[socket.id];
-
     if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
 
+    const p = game.players[socket.id];
     const top = game.discard.at(-1);
+
+    if(!card || !top) return;
 
     const v1 = card.slice(0,-1);
     const v2 = top.slice(0,-1);
@@ -223,7 +208,7 @@ io.on("connection",(socket)=>{
     if(v1 === v2){
       p.hand = p.hand.filter(c => c !== card);
       game.discard.push(card);
-      game.message = "SNAP SUCCESS!";
+      game.message = "SNAP!";
     } else {
       game.message = "Wrong SNAP!";
     }
@@ -233,14 +218,14 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
-  /* CALL GHOULIES */
+  /* GHOULIES */
   socket.on("callGhoulies",()=>{
 
     const game = rooms[roomId];
     if(!game || game.gameOver) return;
 
     game.ghouliesCalled = true;
-    game.message = "GHOULIES CALLED - FINAL ROUND";
+    game.message = "👻 GHOULIES CALLED";
 
     io.to(roomId).emit("state",game);
   });
@@ -249,138 +234,4 @@ io.on("connection",(socket)=>{
 
 server.listen(process.env.PORT || 3000, () => {
   console.log("Server running");
-});let socket = io();
-let state = null;
-let myId = null;
-let snapMode = false;
-
-socket.emit("join", "room1");
-
-socket.on("you", (id) => {
-  myId = id;
-});
-
-socket.on("state", (game) => {
-  state = game;
-  render();
-});
-
-function getMe(game){
-  if(!game || !myId) return null;
-  return game.players[myId];
-}
-
-function getOpponent(game){
-  if(!game || !myId) return null;
-  return Object.values(game.players).find(p => p.id !== myId);
-}
-
-function isMyTurn(){
-  if(!state || !myId) return false;
-  return state.order[state.turn] === myId;
-}
-
-/* =========================
-   RENDER
-========================= */
-function render(){
-
-  if(!state || !myId){
-    document.getElementById("status").innerText = "Connecting...";
-    return;
-  }
-
-  const me = getMe(state);
-  if(!me) return;
-
-  const top = state.discard.at(-1);
-
-  document.getElementById("discard").innerHTML =
-    top ? `<img src="${file(top)}" class="card">` : "";
-
-  let msg = state.message || "";
-
-  if(!state.gameOver){
-    msg = isMyTurn() ? "Your turn" : "Opponent turn";
-  }
-
-  if(me.pendingDraw){
-    msg = `Picked up: ${me.pendingDraw}`;
-  }
-
-  document.getElementById("status").innerText = msg;
-
-  document.getElementById("hand").innerHTML =
-    me.hand.map(c => {
-      let cls = snapMode ? "card snap" : "card";
-      return `<img src="${file(c)}" class="${cls}" data-card="${c}">`;
-    }).join("");
-
-  const opp = getOpponent(state);
-
-  if(opp){
-    document.getElementById("opponent").innerHTML =
-      opp.hand.map(()=> `<div class="card-back"></div>`).join("");
-  }
-
-  document.getElementById("snapBtn").style.display =
-    isMyTurn() ? "inline-block" : "none";
-}
-
-/* =========================
-   CARD IMAGE
-========================= */
-function file(card){
-  const v = card.slice(0,-1);
-  const s = card.slice(-1);
-
-  const suit = {"♠":"s","♥":"h","♦":"d","♣":"c"};
-  const map = {A:"01",J:"11",Q:"12",K:"13"};
-
-  const val = map[v] || v.padStart(2,"0");
-
-  return `/cards/${suit[s]}${val}.png`;
-}
-
-/* =========================
-   CLICK EVENTS
-========================= */
-document.addEventListener("click",(e)=>{
-
-  if(!isMyTurn()) return;
-
-  const me = getMe(state);
-  if(!me) return;
-
-  if(e.target.id === "snapBtn"){
-    snapMode = true;
-    return;
-  }
-
-  if(e.target.id === "ghouliesBtn"){
-    socket.emit("callGhoulies");
-    return;
-  }
-
-  if(snapMode && e.target.dataset.card){
-    socket.emit("snap", e.target.dataset.card);
-    snapMode = false;
-    return;
-  }
-
-  if(e.target.id === "deck"){
-    socket.emit("draw");
-    return;
-  }
-
-  if(e.target.closest("#discard")){
-    const top = state.discard.at(-1);
-    socket.emit("takeDiscard", top);
-    return;
-  }
-
-  if(e.target.dataset.card && me.pendingDraw){
-    socket.emit("swap", e.target.dataset.card);
-    return;
-  }
 });
