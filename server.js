@@ -29,6 +29,29 @@ function createDeck(){
 }
 
 /* =========================
+   SCORING (YOUR RULES)
+========================= */
+function cardValue(card){
+  const v = card.slice(0,-1);
+  const s = card.slice(-1);
+
+  if(v === "A") return 1;
+
+  if(v === "J" || v === "Q" || v === "K"){
+    if(v === "K" && (s === "♥" || s === "♦")){
+      return 0; // RED KINGS
+    }
+    return 10;
+  }
+
+  return parseInt(v);
+}
+
+function handScore(hand){
+  return hand.reduce((sum,c)=>sum+cardValue(c),0);
+}
+
+/* =========================
    GAME STATE
 ========================= */
 const rooms = {};
@@ -40,10 +63,12 @@ function createGame(){
     deck,
     discard:[deck.pop()],
     players:{},
-    order: [],
-    turn: 0,
+    order:[],
+    turn:0,
     phase:"choose",
-    message:""
+    message:"",
+    ghouliesCalled:false,
+    gameOver:false
   };
 }
 
@@ -87,7 +112,31 @@ io.on("connection",(socket)=>{
   }
 
   function nextTurn(game){
+
     game.turn = (game.turn + 1) % game.order.length;
+
+    if(game.ghouliesCalled){
+      endGame(game);
+    }
+  }
+
+  function endGame(game){
+
+    game.gameOver = true;
+
+    const results = Object.values(game.players).map(p => ({
+      id: p.id,
+      score: handScore(p.hand)
+    }));
+
+    const loser = results.find(p => p.score >= 51);
+
+    if(loser){
+      game.message = `GAME OVER: Player LOST (51+)`;
+    } else {
+      const worst = results.sort((a,b)=>b.score-a.score)[0];
+      game.message = `GAME OVER: Highest score loses`;
+    }
   }
 
   /* DRAW */
@@ -96,7 +145,7 @@ io.on("connection",(socket)=>{
     const game = rooms[roomId];
     const p = game.players[socket.id];
 
-    if(!game || game.phase !== "choose") return;
+    if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
 
     const drawn = game.deck.pop();
@@ -104,29 +153,29 @@ io.on("connection",(socket)=>{
     p.pendingDraw = drawn;
     game.phase = "resolve";
 
-    game.message = `Player drew a card`;
+    game.message = "Card drawn";
 
     io.to(roomId).emit("state",game);
   });
 
-  /* TAKE DISCARD */
-  socket.on("takeDiscard",(clientCard)=>{
+  /* DISCARD */
+  socket.on("takeDiscard",(card)=>{
 
     const game = rooms[roomId];
     const p = game.players[socket.id];
 
-    if(!game || game.phase !== "choose") return;
+    if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
 
-    const topCard = game.discard.at(-1);
-    if (clientCard !== topCard) return;
+    const top = game.discard.at(-1);
+    if(card !== top) return;
 
     game.discard.pop();
 
-    p.pendingDraw = topCard;
+    p.pendingDraw = top;
     game.phase = "resolve";
 
-    game.message = `Player took discard`;
+    game.message = `Picked up ${top}`;
 
     io.to(roomId).emit("state",game);
   });
@@ -163,7 +212,8 @@ io.on("connection",(socket)=>{
     const game = rooms[roomId];
     const p = game.players[socket.id];
 
-    if(!game || !isMyTurn(game, socket)) return;
+    if(!game || game.gameOver) return;
+    if(!isMyTurn(game, socket)) return;
 
     const top = game.discard.at(-1);
 
@@ -179,6 +229,18 @@ io.on("connection",(socket)=>{
     }
 
     nextTurn(game);
+
+    io.to(roomId).emit("state",game);
+  });
+
+  /* CALL GHOULIES */
+  socket.on("callGhoulies",()=>{
+
+    const game = rooms[roomId];
+    if(!game || game.gameOver) return;
+
+    game.ghouliesCalled = true;
+    game.message = "GHOULIES CALLED - FINAL ROUND";
 
     io.to(roomId).emit("state",game);
   });

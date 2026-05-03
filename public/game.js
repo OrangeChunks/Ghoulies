@@ -1,7 +1,6 @@
 let socket = io();
 let state = null;
 let myId = null;
-
 let snapMode = false;
 
 socket.emit("join", "room1");
@@ -15,119 +14,121 @@ socket.on("state", (game) => {
   render();
 });
 
-function getMe(game) {
+function getMe(game){
+  if(!game || !myId) return null;
   return game.players[myId];
 }
 
-function getOpponent(game) {
+function getOpponent(game){
+  if(!game || !myId) return null;
   return Object.values(game.players).find(p => p.id !== myId);
 }
 
-function isMyTurn() {
+function isMyTurn(){
+  if(!state || !myId) return false;
   return state.order[state.turn] === myId;
 }
 
 /* =========================
    RENDER
 ========================= */
-function render() {
-  if (!state || !myId) return;
+function render(){
+
+  if(!state || !myId){
+    document.getElementById("status").innerText = "Connecting...";
+    return;
+  }
 
   const me = getMe(state);
-  if (!me) return;
+  if(!me) return;
 
   const top = state.discard.at(-1);
 
-  /* DISCARD */
-  document.getElementById("discard").innerHTML = top
-    ? `<img src="${file(top)}" class="card">`
-    : "";
+  document.getElementById("discard").innerHTML =
+    top ? `<img src="${file(top)}" class="card">` : "";
 
-  /* STATUS */
-  let msg = isMyTurn() ? "Your turn" : "Opponent's turn";
+  let msg = state.message || "";
 
-  if (me.pendingDraw) {
+  if(!state.gameOver){
+    msg = isMyTurn() ? "Your turn" : "Opponent turn";
+  }
+
+  if(me.pendingDraw){
     msg = `Picked up: ${me.pendingDraw}`;
   }
 
   document.getElementById("status").innerText = msg;
 
-  /* HAND */
-  document.getElementById("hand").innerHTML = me.hand
-    .map((c) => {
-      let cls = "card";
-      if (snapMode) cls += " snap";
-
+  document.getElementById("hand").innerHTML =
+    me.hand.map(c => {
+      let cls = snapMode ? "card snap" : "card";
       return `<img src="${file(c)}" class="${cls}" data-card="${c}">`;
-    })
-    .join("");
+    }).join("");
 
-  /* OPPONENT */
   const opp = getOpponent(state);
 
-  if (opp) {
+  if(opp){
     document.getElementById("opponent").innerHTML =
-      opp.hand.map(() =>
-        `<div class="card-back"></div>`
-      ).join("");
+      opp.hand.map(()=> `<div class="card-back"></div>`).join("");
   }
 
-  /* SNAP BUTTON */
   document.getElementById("snapBtn").style.display =
     isMyTurn() ? "inline-block" : "none";
 }
 
-/* CARD IMAGE */
-function file(card) {
-  const v = card.slice(0, -1);
+/* =========================
+   CARD IMAGE
+========================= */
+function file(card){
+  const v = card.slice(0,-1);
   const s = card.slice(-1);
 
-  const suit = { "♠": "s", "♥": "h", "♦": "d", "♣": "c" };
-  const map = { A: "01", J: "11", Q: "12", K: "13" };
+  const suit = {"♠":"s","♥":"h","♦":"d","♣":"c"};
+  const map = {A:"01",J:"11",Q:"12",K:"13"};
 
-  const val = map[v] || v.padStart(2, "0");
+  const val = map[v] || v.padStart(2,"0");
 
   return `/cards/${suit[s]}${val}.png`;
 }
 
 /* =========================
-   CLICK LOGIC
+   CLICK EVENTS
 ========================= */
-document.addEventListener("click", (e) => {
+document.addEventListener("click",(e)=>{
 
-  if (!isMyTurn()) return;
+  if(!isMyTurn()) return;
 
   const me = getMe(state);
-  if (!me) return;
+  if(!me) return;
 
-  /* SNAP BUTTON */
-  if (e.target.id === "snapBtn") {
+  if(e.target.id === "snapBtn"){
     snapMode = true;
     return;
   }
 
-  /* SNAP SELECT */
-  if (snapMode && e.target.dataset.card) {
+  if(e.target.id === "ghouliesBtn"){
+    socket.emit("callGhoulies");
+    return;
+  }
+
+  if(snapMode && e.target.dataset.card){
     socket.emit("snap", e.target.dataset.card);
     snapMode = false;
     return;
   }
 
-  /* DRAW */
-  if (e.target.id === "deck") {
+  if(e.target.id === "deck"){
     socket.emit("draw");
     return;
   }
 
-  /* TAKE DISCARD */
-  if (e.target.closest("#discard")) {
+  if(e.target.closest("#discard")){
     const top = state.discard.at(-1);
     socket.emit("takeDiscard", top);
     return;
   }
 
-  /* SWAP */
-  if (e.target.dataset.card && me?.pendingDraw) {
+  if(e.target.dataset.card && me.pendingDraw){
     socket.emit("swap", e.target.dataset.card);
     return;
   }
