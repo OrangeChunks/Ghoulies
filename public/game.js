@@ -4,18 +4,15 @@ let myId = null;
 
 socket.emit("join", "room1");
 
-/* WHO AM I */
 socket.on("you", (id) => {
   myId = id;
 });
 
-/* GAME STATE */
 socket.on("state", (game) => {
   state = game;
   render();
 });
 
-/* GET PLAYERS */
 function getMe(game) {
   return game.players[myId];
 }
@@ -24,7 +21,13 @@ function getOpponent(game) {
   return Object.values(game.players).find(p => p.id !== myId);
 }
 
-/* RENDER */
+function isMyTurn() {
+  return state.order[state.turn] === myId;
+}
+
+/* =========================
+   RENDER
+========================= */
 function render() {
   if (!state || !myId) return;
 
@@ -39,17 +42,21 @@ function render() {
     : "";
 
   /* STATUS */
-  let msg = "Choose deck or discard";
+  let msg = "";
+
+  if (isMyTurn()) {
+    msg = "Your turn";
+  } else {
+    msg = "Opponent's turn";
+  }
 
   if (me.pendingDraw) {
     msg = `Picked up: ${me.pendingDraw}`;
-  } else if (state.message) {
-    msg = state.message;
   }
 
   document.getElementById("status").innerText = msg;
 
-  /* YOUR HAND */
+  /* HAND */
   document.getElementById("hand").innerHTML = me.hand
     .map((c) => {
       let cls = "card";
@@ -59,7 +66,7 @@ function render() {
     })
     .join("");
 
-  /* OPPONENT HAND */
+  /* OPPONENT */
   const opp = getOpponent(state);
 
   if (opp) {
@@ -83,26 +90,27 @@ function file(card) {
   return `/cards/${suit[s]}${val}.png`;
 }
 
-/* CLICK HANDLER */
+/* =========================
+   CLICK LOGIC (TURN LOCKED)
+========================= */
 document.addEventListener("click", (e) => {
+
+  if (!isMyTurn()) return;
 
   const me = getMe(state);
   if (!me) return;
 
-  /* DRAW */
   if (e.target.id === "deck") {
     socket.emit("draw");
     return;
   }
 
-  /* TAKE DISCARD */
   if (e.target.closest("#discard")) {
     const top = state.discard.at(-1);
     socket.emit("takeDiscard", top);
     return;
   }
 
-  /* SWAP */
   const card = e.target.dataset.card;
 
   if (card && me?.pendingDraw) {
