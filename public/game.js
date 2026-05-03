@@ -1,22 +1,32 @@
 let socket = io();
 let state = null;
+let myId = null;
 
 socket.emit("join", "room1");
 
+/* WHO AM I */
+socket.on("you", (id) => {
+  myId = id;
+});
+
+/* GAME STATE */
 socket.on("state", (game) => {
   state = game;
   render();
 });
 
+/* GET PLAYERS */
 function getMe(game) {
-  return Object.values(game.players)[0];
+  return game.players[myId];
 }
 
-/* =========================
-   RENDER
-========================= */
+function getOpponent(game) {
+  return Object.values(game.players).find(p => p.id !== myId);
+}
+
+/* RENDER */
 function render() {
-  if (!state) return;
+  if (!state || !myId) return;
 
   const me = getMe(state);
   if (!me) return;
@@ -39,7 +49,7 @@ function render() {
 
   document.getElementById("status").innerText = msg;
 
-  /* HAND */
+  /* YOUR HAND */
   document.getElementById("hand").innerHTML = me.hand
     .map((c) => {
       let cls = "card";
@@ -48,11 +58,19 @@ function render() {
       return `<img src="${file(c)}" class="${cls}" data-card="${c}">`;
     })
     .join("");
+
+  /* OPPONENT HAND */
+  const opp = getOpponent(state);
+
+  if (opp) {
+    document.getElementById("opponent").innerHTML =
+      opp.hand.map(() =>
+        `<div class="card-back"></div>`
+      ).join("");
+  }
 }
 
-/* =========================
-   CARD FILE MAP
-========================= */
+/* CARD IMAGE */
 function file(card) {
   const v = card.slice(0, -1);
   const s = card.slice(-1);
@@ -65,20 +83,19 @@ function file(card) {
   return `/cards/${suit[s]}${val}.png`;
 }
 
-/* =========================
-   CLICK LOGIC
-========================= */
+/* CLICK HANDLER */
 document.addEventListener("click", (e) => {
 
   const me = getMe(state);
+  if (!me) return;
 
-  /* DRAW FROM DECK */
+  /* DRAW */
   if (e.target.id === "deck") {
     socket.emit("draw");
     return;
   }
 
-  /* TAKE DISCARD (FIXED: SEND TOP CARD) */
+  /* TAKE DISCARD */
   if (e.target.closest("#discard")) {
     const top = state.discard.at(-1);
     socket.emit("takeDiscard", top);

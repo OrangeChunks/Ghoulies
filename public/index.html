@@ -7,37 +7,28 @@
 
 <body>
 
-  <h1>Ghoulies 🎴</h1>
+<h1>Ghoulies 🎴</h1>
 
-  <!-- =========================
-       BOARD (DECK + DISCARD)
-  ========================== -->
-  <div id="board">
+<!-- BOARD -->
+<div id="board">
+  <div id="deck"></div>
+  <div id="discard"></div>
+</div>
 
-    <!-- FACE DOWN DECK -->
-    <div id="deck" class="card-back"></div>
+<h2 id="status"></h2>
 
-    <!-- DISCARD PILE -->
-    <div id="discard"></div>
+<!-- OPPONENT -->
+<h3>Opponent</h3>
+<div id="opponent"></div>
 
-  </div>
+<!-- PLAYER -->
+<h3>Your Hand</h3>
+<div id="hand"></div>
 
-  <!-- =========================
-       STATUS
-  ========================== -->
-  <h2 id="status">Loading...</h2>
-
-  <!-- =========================
-       PLAYER HAND
-  ========================== -->
-  <div id="hand"></div>
-
-  <!-- =========================
-       SOCKET + GAME SCRIPTS
-       ⚠️ ORDER IS CRITICAL
-  ========================== -->
-
+<!-- SOCKET.IO (IMPORTANT) -->
 <script src="/socket.io/socket.io.js"></script>
+
+<!-- GAME -->
 <script src="game.js"></script>
 
 </body>
