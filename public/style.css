@@ -1,0 +1,80 @@
+body{
+  background:#0f172a;
+  color:white;
+  text-align:center;
+  font-family:sans-serif;
+}
+
+#board{
+  display:flex;
+  justify-content:center;
+  gap:40px;
+  margin:20px;
+}
+
+.card{
+  width:80px;
+  margin:6px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.card:hover{
+  transform:translateY(-6px) scale(1.05);
+}
+
+/* =========================
+   DECK
+========================= */
+.card-back{
+  width:80px;
+  height:110px;
+  background:#1e293b;
+  border:2px solid white;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+
+/* face down deck image */
+.deck{
+  background-image: url("/cards/back.png");
+  background-size: cover;
+  background-position: center;
+}
+
+#deck:hover{
+  transform:translateY(-8px) scale(1.08);
+  filter:brightness(1.2);
+}
+
+/* =========================
+   SNAP HIGHLIGHT
+========================= */
+.snap{
+  outline:3px solid red;
+}
+
+/* =========================
+   FLIP
+========================= */
+.flip{
+  animation:flip 0.3s;
+}
+
+@keyframes flip{
+  from{transform:rotateY(90deg)}
+  to{transform:rotateY(0)}
+}
+
+/* =========================
+   ✨ CARD FLY ANIMATION (NEW)
+========================= */
+.fly{
+  position: absolute;
+  z-index: 999;
+  transition: transform 0.6s ease, opacity 0.6s ease;
+  pointer-events: none;
+}
