@@ -1,100 +1,145 @@
-let socket = io();
-let state = null;
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 
-socket.emit("join", "room1");
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
-socket.on("state", (game) => {
-  state = game;
-  render();
+app.use(express.static("public"));
+
+/* =========================
+   CARD SETUP
+========================= */
+const SUITS = ["♠","♥","♦","♣"];
+const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+
+function shuffle(a){
+  return a.sort(()=>Math.random()-0.5);
+}
+
+function createDeck(){
+  let d=[];
+  for(let s of SUITS){
+    for(let v of VALUES){
+      d.push(v+s);
+    }
+  }
+  return shuffle(d);
+}
+
+/* =========================
+   ROOMS
+========================= */
+const rooms = {};
+
+function createGame(){
+  const deck = createDeck();
+
+  return {
+    deck,
+    discard:[deck.pop()],
+    players:{},
+    phase:"choose",
+    message:""
+  };
+}
+
+/* =========================
+   SOCKET
+========================= */
+io.on("connection",(socket)=>{
+
+  let roomId = null;
+
+  socket.on("join",(id)=>{
+
+    roomId = id;
+
+    if(!rooms[roomId]){
+      rooms[roomId] = createGame();
+    }
+
+    const game = rooms[roomId];
+
+    if(Object.keys(game.players).length < 2){
+      game.players[socket.id] = {
+        hand: game.deck.splice(0,4),
+        pendingDraw: null
+      };
+    }
+
+    socket.join(roomId);
+    io.to(roomId).emit("state",game);
+  });
+
+  /* =========================
+     DRAW FROM DECK
+  ========================== */
+  socket.on("draw",()=>{
+
+    const game = rooms[roomId];
+    const p = game.players[socket.id];
+
+    if(!game || game.phase !== "choose") return;
+
+    const drawn = game.deck.pop();
+
+    p.pendingDraw = drawn;
+    game.phase = "resolve";
+
+    game.message = `You drew: ${drawn}`;
+
+    io.to(roomId).emit("state",game);
+  });
+
+  /* =========================
+     TAKE FROM DISCARD (FIXED)
+  ========================== */
+  socket.on("takeDiscard",()=>{
+
+    const game = rooms[roomId];
+    const p = game.players[socket.id];
+
+    if(!game || game.phase !== "choose") return;
+    if(game.discard.length === 0) return;
+
+    const taken = game.discard.pop(); // 🔥 REAL DISCARD CARD
+
+    p.pendingDraw = taken;
+    game.phase = "resolve";
+
+    game.message = `You took: ${taken}`;
+
+    io.to(roomId).emit("state",game);
+  });
+
+  /* =========================
+     SWAP
+  ========================== */
+  socket.on("swap",(card)=>{
+
+    const game = rooms[roomId];
+    const p = game.players[socket.id];
+
+    if(!p?.pendingDraw) return;
+
+    const i = p.hand.indexOf(card);
+    if(i === -1) return;
+
+    const old = p.hand[i];
+
+    p.hand[i] = p.pendingDraw;
+    game.discard.push(old);
+
+    p.pendingDraw = null;
+    game.phase = "choose";
+
+    io.to(roomId).emit("state",game);
+  });
+
 });
 
-function getMe(game) {
-  return Object.values(game.players)[0];
-}
-
-/* =========================
-   RENDER
-========================= */
-function render() {
-  if (!state) return;
-
-  const me = getMe(state);
-  if (!me) return;
-
-  const top = state.discard.at(-1);
-
-  /* =========================
-     DISCARD PILE
-  ========================== */
-  document.getElementById("discard").innerHTML = top
-    ? `<img src="${file(top)}" class="card">`
-    : "";
-
-  /* =========================
-     STATUS (🔥 FIXED HERE)
-  ========================== */
-  let msg = "Choose deck or discard";
-
-  if (me.pendingDraw) {
-    msg = `Picked up: ${me.pendingDraw}`;
-  } else if (state.message) {
-    msg = state.message;
-  }
-
-  document.getElementById("status").innerText = msg;
-
-  /* =========================
-     HAND
-  ========================== */
-  document.getElementById("hand").innerHTML = me.hand
-    .map((c) => {
-      let cls = "card";
-
-      if (me.pendingDraw) cls += " snap";
-
-      return `<img src="${file(c)}" class="${cls}" data-card="${c}">`;
-    })
-    .join("");
-}
-
-/* =========================
-   CARD IMAGE
-========================= */
-function file(card) {
-  const v = card.slice(0, -1);
-  const s = card.slice(-1);
-
-  const suit = { "♠": "s", "♥": "h", "♦": "d", "♣": "c" };
-  const map = { A: "01", J: "11", Q: "12", K: "13" };
-
-  const val = map[v] || v.padStart(2, "0");
-
-  return `/cards/${suit[s]}${val}.png`;
-}
-
-/* =========================
-   CLICK LOGIC
-========================= */
-document.addEventListener("click", (e) => {
-
-  const me = getMe(state);
-
-  /* DRAW */
-  if (e.target.id === "deck") {
-    socket.emit("draw");
-    return;
-  }
-
-  if (e.target.closest("#discard")) {
-    socket.emit("draw");
-    return;
-  }
-
-  /* SWAP */
-  const card = e.target.dataset.card;
-
-  if (card && me?.pendingDraw) {
-    socket.emit("swap", card);
-    return;
-  }
+server.listen(process.env.PORT || 3000, () => {
+  console.log("Server running");
 });

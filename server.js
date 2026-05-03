@@ -41,8 +41,7 @@ function createGame(){
     discard:[deck.pop()],
     players:{},
     phase:"choose",
-    message:"",
-    turn:0
+    message:""
   };
 }
 
@@ -75,7 +74,7 @@ io.on("connection",(socket)=>{
   });
 
   /* =========================
-     DRAW (FIXED)
+     DRAW FROM DECK
   ========================== */
   socket.on("draw",()=>{
 
@@ -87,28 +86,30 @@ io.on("connection",(socket)=>{
     const drawn = game.deck.pop();
 
     p.pendingDraw = drawn;
-
     game.phase = "resolve";
+
     game.message = `You drew: ${drawn}`;
 
     io.to(roomId).emit("state",game);
   });
 
   /* =========================
-     DISCARD
+     TAKE FROM DISCARD (FIXED)
   ========================== */
-  socket.on("discard",()=>{
+  socket.on("takeDiscard",()=>{
 
     const game = rooms[roomId];
     const p = game.players[socket.id];
 
-    if(!p?.pendingDraw) return;
+    if(!game || game.phase !== "choose") return;
+    if(game.discard.length === 0) return;
 
-    game.discard.push(p.pendingDraw);
-    p.pendingDraw = null;
+    const taken = game.discard.pop(); // 🔥 REAL DISCARD CARD
 
-    game.phase = "choose";
-    game.message = "";
+    p.pendingDraw = taken;
+    game.phase = "resolve";
+
+    game.message = `You took: ${taken}`;
 
     io.to(roomId).emit("state",game);
   });
@@ -132,7 +133,6 @@ io.on("connection",(socket)=>{
     game.discard.push(old);
 
     p.pendingDraw = null;
-
     game.phase = "choose";
 
     io.to(roomId).emit("state",game);
