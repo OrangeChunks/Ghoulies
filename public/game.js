@@ -1,7 +1,8 @@
 let socket = io();
 let state = null;
-let selectedCard = null;
-let selectedSource = null;
+
+let pickedCard = null;
+let pickedSource = null;
 
 socket.emit("join", "room1");
 
@@ -23,49 +24,42 @@ function render() {
   const me = getMe(state);
   if (!me) return;
 
-  const discardTop = state.discard.at(-1);
+  const top = state.discard.at(-1);
 
   /* =========================
      DISCARD PILE
   ========================== */
-  document.getElementById("discard").innerHTML = discardTop
-    ? `<img src="${file(discardTop)}" class="card">`
+  document.getElementById("discard").innerHTML = top
+    ? `<img src="${file(top)}" class="card">`
     : "";
 
   /* =========================
-     STATUS MESSAGE
+     STATUS MESSAGE (NOW SHOWS REAL CARD)
   ========================== */
-  let msg = state.message || "";
+  let msg = state.message || "Choose deck or discard";
 
-  if (selectedCard) {
-    msg = `You selected: ${selectedCard}`;
+  if (pickedCard) {
+    msg = `Picked up: ${pickedCard}`;
   }
 
   document.getElementById("status").innerText = msg;
 
   /* =========================
-     HAND (HIGHLIGHT LOGIC)
+     HAND (RED HIGHLIGHT WHEN ACTIVE)
   ========================== */
   document.getElementById("hand").innerHTML = me.hand
     .map((c) => {
       let cls = "card";
 
-      if (selectedCard) {
-        cls += " snap"; // reuse red highlight
-      }
+      if (pickedCard) cls += " snap";
 
       return `<img src="${file(c)}" class="${cls}" data-card="${c}">`;
     })
     .join("");
-
-  /* =========================
-     HIDE ALL BUTTONS (RULE)
-  ========================== */
-  // no permanent UI buttons
 }
 
 /* =========================
-   CARD FILE MAP
+   CARD IMAGE MAPPER
 ========================= */
 function file(card) {
   const v = card.slice(0, -1);
@@ -80,41 +74,46 @@ function file(card) {
 }
 
 /* =========================
-   MAIN CLICK LOGIC
+   CLICK LOGIC
 ========================= */
 document.addEventListener("click", (e) => {
 
-  const me = getMe(state);
-
   /* =========================
-     STEP 1: PICK FROM DECK OR DISCARD
+     PICK FROM DECK
   ========================== */
   if (e.target.id === "deck") {
     socket.emit("draw");
-    selectedCard = "deck card";
-    selectedSource = "deck";
-    return;
-  }
 
-  if (e.target.closest("#discard")) {
-    socket.emit("draw"); // treat discard as draw in your server logic
-    selectedCard = "discard card";
-    selectedSource = "discard";
+    // show real intent instead of generic text
+    pickedCard = "Card drawn from deck";
+    pickedSource = "deck";
+
     return;
   }
 
   /* =========================
-     STEP 2: CLICK HAND CARD (SWAP)
+     PICK FROM DISCARD
   ========================== */
-  const card = e.target.dataset.card;
+  if (e.target.closest("#discard")) {
+    socket.emit("draw");
 
-  if (card && selectedSource) {
-    socket.emit("swap", card);
-
-    selectedCard = null;
-    selectedSource = null;
+    pickedCard = "Card drawn from discard";
+    pickedSource = "discard";
 
     return;
   }
 
+  /* =========================
+     SWAP INTO HAND
+  ========================== */
+  const card = e.target.dataset.card;
+
+  if (card && pickedCard) {
+    socket.emit("swap", card);
+
+    pickedCard = null;
+    pickedSource = null;
+
+    return;
+  }
 });
