@@ -19,7 +19,6 @@ function opp(){
   return Object.values(state.players).find(p=>p.id!==myId);
 }
 
-/* CARD IMAGE */
 function file(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
@@ -30,20 +29,24 @@ function file(card){
   return `/cards/${suit[s]}${map[v]||v.padStart(2,"0")}.png`;
 }
 
-/* RENDER */
+/* =========================
+   RENDER
+========================= */
 function render(){
 
   if(!state) return;
 
   const p = me();
 
+  const isTurn = state.order[state.turn] === myId;
+
+  document.getElementById("status").innerText =
+    isTurn ? "🎯 Your turn" : "⏳ Their turn";
+
   const top = state.discard.at(-1);
 
   document.getElementById("discard").innerHTML =
     top ? `<img src="${file(top)}" class="card">` : "";
-
-  document.getElementById("status").innerText =
-    p.pendingDraw ? `Picked up ${p.pendingDraw}` : state.message;
 
   document.getElementById("hand").innerHTML =
     p.hand.map(c=>`<img src="${file(c)}" data-card="${c}" class="card">`).join("");
@@ -53,18 +56,29 @@ function render(){
   document.getElementById("opponent").innerHTML =
     o.hand.map(()=>`<div class="card-back"></div>`).join("");
 
-  let scoreHTML = "<h3>Scores</h3>";
-  for(const id in state.scores){
-    scoreHTML += `<div>${id===myId?"You":"Opponent"}: ${state.scores[id]}</div>`;
+  /* =========================
+     SCOREBOARD FIX
+  ========================= */
+  let html = "<h3>Scores</h3>";
+
+  if(state.scores){
+    for(const id in state.scores){
+      html += `<div>${id===myId?"You":"Opponent"}: ${state.scores[id]}</div>`;
+    }
   }
-  document.getElementById("scores").innerHTML = scoreHTML;
+
+  document.getElementById("scores").innerHTML = html;
 }
 
-/* CLICK */
+/* =========================
+   CLICK HANDLER
+========================= */
 document.addEventListener("click",(e)=>{
 
+  const isTurn = state.order[state.turn] === myId;
+  if(!isTurn) return;
+
   const p = me();
-  if(!p) return;
 
   if(e.target.id === "deck"){
     socket.emit("draw");
@@ -90,7 +104,9 @@ document.addEventListener("click",(e)=>{
   }
 });
 
-/* SNAP ANYTIME */
+/* =========================
+   SNAP ANYTIME
+========================= */
 document.addEventListener("dblclick",(e)=>{
 
   const card = e.target.dataset.card;
