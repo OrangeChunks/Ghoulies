@@ -8,9 +8,6 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
-/* =========================
-   CARD SETUP
-========================= */
 const SUITS = ["♠","♥","♦","♣"];
 const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
@@ -28,14 +25,8 @@ function createDeck(){
   return shuffle(d);
 }
 
-/* =========================
-   ROOMS (MULTIPLAYER CORE)
-========================= */
 const rooms = {};
 
-/* =========================
-   CREATE GAME STATE
-========================= */
 function createGame(){
   const deck = createDeck();
 
@@ -44,19 +35,14 @@ function createGame(){
     discard:[deck.pop()],
     players:{},
     phase:"choose",
-    message:"",
-    turn:0
+    message:""
   };
 }
 
-/* =========================
-   SOCKET CONNECTION
-========================= */
 io.on("connection",(socket)=>{
 
   let roomId = null;
 
-  /* JOIN ROOM */
   socket.on("join",(id)=>{
 
     roomId = id;
@@ -75,11 +61,9 @@ io.on("connection",(socket)=>{
     }
 
     socket.join(roomId);
-
     io.to(roomId).emit("state",game);
   });
 
-  /* DRAW */
   socket.on("draw",()=>{
 
     const game = rooms[roomId];
@@ -89,13 +73,11 @@ io.on("connection",(socket)=>{
 
     p.pendingDraw = game.deck.pop();
     game.phase = "resolve";
-
     game.message = "Card drawn";
 
     io.to(roomId).emit("state",game);
   });
 
-  /* DISCARD */
   socket.on("discard",()=>{
 
     const game = rooms[roomId];
@@ -110,7 +92,6 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
-  /* SWAP */
   socket.on("swap",(card)=>{
 
     const game = rooms[roomId];
@@ -125,13 +106,11 @@ io.on("connection",(socket)=>{
     game.discard.push(old);
 
     p.pendingDraw = null;
-
     game.phase = "choose";
 
     io.to(roomId).emit("state",game);
   });
 
-  /* SNAP */
   socket.on("snap",(card)=>{
 
     const game = rooms[roomId];
@@ -158,3 +137,4 @@ io.on("connection",(socket)=>{
 
 server.listen(process.env.PORT || 3000, () => {
   console.log("Server running");
+});
