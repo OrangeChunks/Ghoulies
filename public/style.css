@@ -6,7 +6,7 @@ body {
 }
 
 /* =========================
-   BOARD LAYOUT
+   BOARD
 ========================= */
 #board {
   display: flex;
@@ -17,7 +17,7 @@ body {
 }
 
 /* =========================
-   CARDS (HAND + DISCARD)
+   CARD BASE
 ========================= */
 .card {
   width: 92px;
@@ -32,7 +32,7 @@ body {
 }
 
 /* =========================
-   DISCARD PILE
+   DISCARD IMAGE
 ========================= */
 #discard img {
   width: 92px;
@@ -40,19 +40,25 @@ body {
 }
 
 /* =========================
-   FACE DOWN DECK (IMPORTANT FIX)
+   DECK (FORCED BACK IMAGE)
+   🔥 THIS IS THE IMPORTANT FIX
 ========================= */
 #deck {
-  width: 92px;
-  height: 132px;
-  background-image: url("/cards/back.png");
-  background-size: cover;
-  background-position: center;
+  width: 92px !important;
+  height: 132px !important;
+
+  background-image: url("/cards/back.png") !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+
   border-radius: 8px;
   cursor: pointer;
-  transition: 0.2s;
+
+  display: block;
 }
 
+/* hover animation */
 #deck:hover {
   transform: translateY(-6px);
 }
@@ -62,16 +68,4 @@ body {
 ========================= */
 #status {
   margin-top: 10px;
-}
-
-/* =========================
-   OPTIONAL ANIMATIONS
-========================= */
-.flip {
-  animation: flip 0.3s;
-}
-
-@keyframes flip {
-  from { transform: rotateY(90deg); }
-  to { transform: rotateY(0); }
 }
