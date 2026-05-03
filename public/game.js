@@ -1,81 +1,74 @@
-const socket = io();
-
-let room = "room1";
-
-socket.emit("join",room);
-
+let socket = io();
 let state;
 
-function file(card){
-  const v = card.slice(0,-1);
+socket.emit("join", "room1");
+
+socket.on("state", (game) => {
+  state = game;
+  render();
+});
+
+function getMe(game) {
+  const players = Object.values(game.players);
+  return players[0]; // fallback safe (fixes undefined issue)
+}
+
+function render() {
+  if (!state) return;
+
+  const me = getMe(state);
+  if (!me) return;
+
+  /* =========================
+     DISCARD PILE
+  ========================== */
+  const top = state.discard[state.discard.length - 1];
+
+  document.getElementById("discard").innerHTML = top
+    ? `<img src="${file(top)}" class="card">`
+    : "";
+
+  /* =========================
+     HAND
+  ========================== */
+  document.getElementById("hand").innerHTML = me.hand
+    .map((c) => `<img src="${file(c)}" class="card" data-card="${c}">`)
+    .join("");
+
+  /* =========================
+     STATUS
+  ========================== */
+  document.getElementById("status").innerText =
+    state.message || "Waiting...";
+}
+
+/* =========================
+   CARD IMAGE MAP
+========================= */
+function file(card) {
+  const v = card.slice(0, -1);
   const s = card.slice(-1);
 
-  const suit = {"♠":"s","♥":"h","♦":"d","♣":"c"};
-  const map = {"A":"01","J":"11","Q":"12","K":"13"};
+  const suit = { "♠": "s", "♥": "h", "♦": "d", "♣": "c" };
+  const map = { A: "01", J: "11", Q: "12", K: "13" };
 
-  const val = map[v] || v.padStart(2,"0");
+  const val = map[v] || v.padStart(2, "0");
 
   return `/cards/${suit[s]}${val}.png`;
 }
 
 /* =========================
-   RECEIVE STATE
+   CLICK EVENTS
 ========================= */
-socket.on("state",(g)=>{
-  state = g;
-  render();
-});
+document.addEventListener("click", (e) => {
 
-/* =========================
-   RENDER
-========================= */
-function render(){
+  const card = e.target.dataset.card;
 
-  const me = Object.values(state.players)[0];
+  if (card) {
+    socket.emit("snap", card);
+  }
 
-  const top = state.discard.at(-1);
-
-  document.getElementById("discard").innerHTML =
-    `<img src="${file(top)}" class="card">`;
-
-  document.getElementById("hand").innerHTML =
-    me.hand.map(c=>
-      `<img src="${file(c)}" class="card" data-card="${c}">`
-    ).join("");
-
-  document.getElementById("status").innerText = state.message || state.phase;
-
-  document.getElementById("actions").innerHTML =
-    state.phase === "choose"
-      ? `<button id="snapBtn">SNAP</button>`
-      : `<button id="discardBtn">Discard</button>`;
-}
-
-/* =========================
-   EVENTS
-========================= */
-document.addEventListener("click",(e)=>{
-
-  if(e.target.id==="deck"){
+  if (e.target.id === "deck") {
     socket.emit("draw");
-  }
-
-  if(e.target.id==="discardBtn"){
-    socket.emit("discard");
-  }
-
-  if(e.target.id==="snapBtn"){
-    socket.emit("snapMode");
-  }
-
-  if(e.target.dataset.card){
-
-    if(state.phase==="snap"){
-      socket.emit("snap",e.target.dataset.card);
-    }
-
-    if(state.phase==="resolve"){
-      socket.emit("swap",e.target.dataset.card);
-    }
   }
 });

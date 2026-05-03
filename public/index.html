@@ -9,26 +9,38 @@
 
   <h1>Ghoulies 🎴</h1>
 
-  <!-- BOARD -->
+  <!-- =========================
+       BOARD (DECK + DISCARD)
+  ========================== -->
   <div id="board">
 
     <!-- FACE DOWN DECK -->
-    <div id="deck" class="card-back deck"></div>
+    <div id="deck" class="card-back"></div>
 
     <!-- DISCARD PILE -->
     <div id="discard"></div>
 
   </div>
 
-  <!-- STATUS -->
-  <h2 id="status"></h2>
+  <!-- =========================
+       STATUS
+  ========================== -->
+  <h2 id="status">Loading...</h2>
 
-  <!-- DYNAMIC ACTIONS ONLY (used by JS when needed) -->
-  <div id="actions"></div>
-
-  <!-- PLAYER HAND -->
+  <!-- =========================
+       PLAYER HAND
+  ========================== -->
   <div id="hand"></div>
 
+  <!-- =========================
+       SOCKET + GAME SCRIPTS
+       ⚠️ ORDER IS CRITICAL
+  ========================== -->
+
+  <!-- Socket.IO client MUST load first -->
+  <script src="/socket.io/socket.io.js"></script>
+
+  <!-- Your game logic -->
   <script src="game.js"></script>
 
 </body>
