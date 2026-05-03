@@ -1,5 +1,7 @@
 let socket = io();
-let state;
+let state = null;
+let selectedCard = null;
+let selectedSource = null;
 
 socket.emit("join", "room1");
 
@@ -9,41 +11,61 @@ socket.on("state", (game) => {
 });
 
 function getMe(game) {
-  const players = Object.values(game.players);
-  return players[0]; // fallback safe (fixes undefined issue)
+  return Object.values(game.players)[0];
 }
 
+/* =========================
+   RENDER
+========================= */
 function render() {
   if (!state) return;
 
   const me = getMe(state);
   if (!me) return;
 
+  const discardTop = state.discard.at(-1);
+
   /* =========================
      DISCARD PILE
   ========================== */
-  const top = state.discard[state.discard.length - 1];
-
-  document.getElementById("discard").innerHTML = top
-    ? `<img src="${file(top)}" class="card">`
+  document.getElementById("discard").innerHTML = discardTop
+    ? `<img src="${file(discardTop)}" class="card">`
     : "";
 
   /* =========================
-     HAND
+     STATUS MESSAGE
+  ========================== */
+  let msg = state.message || "";
+
+  if (selectedCard) {
+    msg = `You selected: ${selectedCard}`;
+  }
+
+  document.getElementById("status").innerText = msg;
+
+  /* =========================
+     HAND (HIGHLIGHT LOGIC)
   ========================== */
   document.getElementById("hand").innerHTML = me.hand
-    .map((c) => `<img src="${file(c)}" class="card" data-card="${c}">`)
+    .map((c) => {
+      let cls = "card";
+
+      if (selectedCard) {
+        cls += " snap"; // reuse red highlight
+      }
+
+      return `<img src="${file(c)}" class="${cls}" data-card="${c}">`;
+    })
     .join("");
 
   /* =========================
-     STATUS
+     HIDE ALL BUTTONS (RULE)
   ========================== */
-  document.getElementById("status").innerText =
-    state.message || "Waiting...";
+  // no permanent UI buttons
 }
 
 /* =========================
-   CARD IMAGE MAP
+   CARD FILE MAP
 ========================= */
 function file(card) {
   const v = card.slice(0, -1);
@@ -58,17 +80,41 @@ function file(card) {
 }
 
 /* =========================
-   CLICK EVENTS
+   MAIN CLICK LOGIC
 ========================= */
 document.addEventListener("click", (e) => {
 
-  const card = e.target.dataset.card;
+  const me = getMe(state);
 
-  if (card) {
-    socket.emit("snap", card);
-  }
-
+  /* =========================
+     STEP 1: PICK FROM DECK OR DISCARD
+  ========================== */
   if (e.target.id === "deck") {
     socket.emit("draw");
+    selectedCard = "deck card";
+    selectedSource = "deck";
+    return;
   }
+
+  if (e.target.closest("#discard")) {
+    socket.emit("draw"); // treat discard as draw in your server logic
+    selectedCard = "discard card";
+    selectedSource = "discard";
+    return;
+  }
+
+  /* =========================
+     STEP 2: CLICK HAND CARD (SWAP)
+  ========================== */
+  const card = e.target.dataset.card;
+
+  if (card && selectedSource) {
+    socket.emit("swap", card);
+
+    selectedCard = null;
+    selectedSource = null;
+
+    return;
+  }
+
 });
