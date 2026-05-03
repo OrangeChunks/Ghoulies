@@ -9,7 +9,7 @@ const io = new Server(server);
 app.use(express.static("public"));
 
 /* =========================
-   CARD SETUP
+   DECK
 ========================= */
 const SUITS = ["♠","♥","♦","♣"];
 const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
@@ -29,7 +29,7 @@ function createDeck(){
 }
 
 /* =========================
-   ROOMS
+   GAME STATE
 ========================= */
 const rooms = {};
 
@@ -75,7 +75,7 @@ io.on("connection",(socket)=>{
 
   /* =========================
      DRAW FROM DECK
-  ========================== */
+========================= */
   socket.on("draw",()=>{
 
     const game = rooms[roomId];
@@ -94,9 +94,9 @@ io.on("connection",(socket)=>{
   });
 
   /* =========================
-     TAKE FROM DISCARD (FIXED)
-  ========================== */
-  socket.on("takeDiscard",()=>{
+     TAKE DISCARD (FIXED + SAFE)
+========================= */
+  socket.on("takeDiscard",(clientCard)=>{
 
     const game = rooms[roomId];
     const p = game.players[socket.id];
@@ -104,19 +104,24 @@ io.on("connection",(socket)=>{
     if(!game || game.phase !== "choose") return;
     if(game.discard.length === 0) return;
 
-    const taken = game.discard.pop(); // 🔥 REAL DISCARD CARD
+    const topCard = game.discard.at(-1);
 
-    p.pendingDraw = taken;
+    // 🔒 HARD VALIDATION (prevents mismatch)
+    if (clientCard !== topCard) return;
+
+    game.discard.pop();
+
+    p.pendingDraw = topCard;
     game.phase = "resolve";
 
-    game.message = `You took: ${taken}`;
+    game.message = `You took: ${topCard}`;
 
     io.to(roomId).emit("state",game);
   });
 
   /* =========================
      SWAP
-  ========================== */
+========================= */
   socket.on("swap",(card)=>{
 
     const game = rooms[roomId];
