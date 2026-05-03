@@ -8,6 +8,9 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
+/* =========================
+   CARD SETUP
+========================= */
 const SUITS = ["♠","♥","♦","♣"];
 const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
@@ -25,6 +28,9 @@ function createDeck(){
   return shuffle(d);
 }
 
+/* =========================
+   ROOMS
+========================= */
 const rooms = {};
 
 function createGame(){
@@ -35,10 +41,14 @@ function createGame(){
     discard:[deck.pop()],
     players:{},
     phase:"choose",
-    message:""
+    message:"",
+    turn:0
   };
 }
 
+/* =========================
+   SOCKET
+========================= */
 io.on("connection",(socket)=>{
 
   let roomId = null;
@@ -56,7 +66,7 @@ io.on("connection",(socket)=>{
     if(Object.keys(game.players).length < 2){
       game.players[socket.id] = {
         hand: game.deck.splice(0,4),
-        pendingDraw:null
+        pendingDraw: null
       };
     }
 
@@ -64,24 +74,35 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
+  /* =========================
+     DRAW (FIXED)
+  ========================== */
   socket.on("draw",()=>{
 
     const game = rooms[roomId];
     const p = game.players[socket.id];
 
-    if(game.phase !== "choose") return;
+    if(!game || game.phase !== "choose") return;
 
-    p.pendingDraw = game.deck.pop();
+    const drawn = game.deck.pop();
+
+    p.pendingDraw = drawn;
+
     game.phase = "resolve";
-    game.message = "Card drawn";
+    game.message = `You drew: ${drawn}`;
 
     io.to(roomId).emit("state",game);
   });
 
+  /* =========================
+     DISCARD
+  ========================== */
   socket.on("discard",()=>{
 
     const game = rooms[roomId];
     const p = game.players[socket.id];
+
+    if(!p?.pendingDraw) return;
 
     game.discard.push(p.pendingDraw);
     p.pendingDraw = null;
@@ -92,10 +113,15 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
+  /* =========================
+     SWAP
+  ========================== */
   socket.on("swap",(card)=>{
 
     const game = rooms[roomId];
     const p = game.players[socket.id];
+
+    if(!p?.pendingDraw) return;
 
     const i = p.hand.indexOf(card);
     if(i === -1) return;
@@ -106,27 +132,6 @@ io.on("connection",(socket)=>{
     game.discard.push(old);
 
     p.pendingDraw = null;
-    game.phase = "choose";
-
-    io.to(roomId).emit("state",game);
-  });
-
-  socket.on("snap",(card)=>{
-
-    const game = rooms[roomId];
-    const p = game.players[socket.id];
-    const top = game.discard.at(-1);
-
-    const v1 = card.slice(0,-1);
-    const v2 = top.slice(0,-1);
-
-    if(v1 === v2){
-      p.hand = p.hand.filter(c => c !== card);
-      game.discard.push(card);
-      game.message = "SNAP SUCCESS!";
-    } else {
-      game.message = "Wrong SNAP!";
-    }
 
     game.phase = "choose";
 

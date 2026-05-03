@@ -1,9 +1,6 @@
 let socket = io();
 let state = null;
 
-let pickedCard = null;
-let pickedSource = null;
-
 socket.emit("join", "room1");
 
 socket.on("state", (game) => {
@@ -27,31 +24,27 @@ function render() {
   const top = state.discard.at(-1);
 
   /* =========================
-     DISCARD PILE
+     DISCARD
   ========================== */
   document.getElementById("discard").innerHTML = top
     ? `<img src="${file(top)}" class="card">`
     : "";
 
   /* =========================
-     STATUS MESSAGE (NOW SHOWS REAL CARD)
+     STATUS (SHOW REAL CARD)
   ========================== */
   let msg = state.message || "Choose deck or discard";
-
-  if (pickedCard) {
-    msg = `Picked up: ${pickedCard}`;
-  }
 
   document.getElementById("status").innerText = msg;
 
   /* =========================
-     HAND (RED HIGHLIGHT WHEN ACTIVE)
+     HAND (RED HIGHLIGHT IF CARD HELD)
   ========================== */
   document.getElementById("hand").innerHTML = me.hand
     .map((c) => {
       let cls = "card";
 
-      if (pickedCard) cls += " snap";
+      if (me.pendingDraw) cls += " snap";
 
       return `<img src="${file(c)}" class="${cls}" data-card="${c}">`;
     })
@@ -59,7 +52,7 @@ function render() {
 }
 
 /* =========================
-   CARD IMAGE MAPPER
+   FILE MAP
 ========================= */
 function file(card) {
   const v = card.slice(0, -1);
@@ -78,42 +71,29 @@ function file(card) {
 ========================= */
 document.addEventListener("click", (e) => {
 
+  const me = getMe(state);
+
   /* =========================
-     PICK FROM DECK
+     DRAW
   ========================== */
   if (e.target.id === "deck") {
     socket.emit("draw");
-
-    // show real intent instead of generic text
-    pickedCard = "Card drawn from deck";
-    pickedSource = "deck";
-
     return;
   }
 
-  /* =========================
-     PICK FROM DISCARD
-  ========================== */
   if (e.target.closest("#discard")) {
     socket.emit("draw");
-
-    pickedCard = "Card drawn from discard";
-    pickedSource = "discard";
-
     return;
   }
 
   /* =========================
-     SWAP INTO HAND
+     SWAP WITH HELD CARD
   ========================== */
   const card = e.target.dataset.card;
 
-  if (card && pickedCard) {
+  if (card && me?.pendingDraw) {
     socket.emit("swap", card);
-
-    pickedCard = null;
-    pickedSource = null;
-
     return;
   }
+
 });
