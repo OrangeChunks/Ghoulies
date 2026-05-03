@@ -9,26 +9,22 @@
 
 <h1>Ghoulies 🎴</h1>
 
-<!-- BOARD -->
 <div id="board">
-  <div id="deck"></div>
+  <div id="deck" class="card-back"></div>
   <div id="discard"></div>
 </div>
 
 <h2 id="status"></h2>
 
-<!-- OPPONENT -->
+<button id="snapBtn">SNAP</button>
+
 <h3>Opponent</h3>
 <div id="opponent"></div>
 
-<!-- PLAYER -->
 <h3>Your Hand</h3>
 <div id="hand"></div>
 
-<!-- SOCKET.IO (IMPORTANT) -->
 <script src="/socket.io/socket.io.js"></script>
-
-<!-- GAME -->
 <script src="game.js"></script>
 
 </body>

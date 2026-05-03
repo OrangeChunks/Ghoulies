@@ -40,7 +40,7 @@ function createGame(){
     deck,
     discard:[deck.pop()],
     players:{},
-    order: [], // 🔥 turn order
+    order: [],
     turn: 0,
     phase:"choose",
     message:""
@@ -72,7 +72,7 @@ io.on("connection",(socket)=>{
         pendingDraw: null
       };
 
-      game.order.push(socket.id); // 🔥 add to turn order
+      game.order.push(socket.id);
     }
 
     socket.join(roomId);
@@ -152,7 +152,33 @@ io.on("connection",(socket)=>{
 
     game.phase = "choose";
 
-    nextTurn(game); // 🔥 TURN SWITCH
+    nextTurn(game);
+
+    io.to(roomId).emit("state",game);
+  });
+
+  /* SNAP */
+  socket.on("snap",(card)=>{
+
+    const game = rooms[roomId];
+    const p = game.players[socket.id];
+
+    if(!game || !isMyTurn(game, socket)) return;
+
+    const top = game.discard.at(-1);
+
+    const v1 = card.slice(0,-1);
+    const v2 = top.slice(0,-1);
+
+    if(v1 === v2){
+      p.hand = p.hand.filter(c => c !== card);
+      game.discard.push(card);
+      game.message = "SNAP SUCCESS!";
+    } else {
+      game.message = "Wrong SNAP!";
+    }
+
+    nextTurn(game);
 
     io.to(roomId).emit("state",game);
   });

@@ -2,6 +2,8 @@ let socket = io();
 let state = null;
 let myId = null;
 
+let snapMode = false;
+
 socket.emit("join", "room1");
 
 socket.on("you", (id) => {
@@ -42,13 +44,7 @@ function render() {
     : "";
 
   /* STATUS */
-  let msg = "";
-
-  if (isMyTurn()) {
-    msg = "Your turn";
-  } else {
-    msg = "Opponent's turn";
-  }
+  let msg = isMyTurn() ? "Your turn" : "Opponent's turn";
 
   if (me.pendingDraw) {
     msg = `Picked up: ${me.pendingDraw}`;
@@ -60,7 +56,7 @@ function render() {
   document.getElementById("hand").innerHTML = me.hand
     .map((c) => {
       let cls = "card";
-      if (me.pendingDraw) cls += " snap";
+      if (snapMode) cls += " snap";
 
       return `<img src="${file(c)}" class="${cls}" data-card="${c}">`;
     })
@@ -75,6 +71,10 @@ function render() {
         `<div class="card-back"></div>`
       ).join("");
   }
+
+  /* SNAP BUTTON */
+  document.getElementById("snapBtn").style.display =
+    isMyTurn() ? "inline-block" : "none";
 }
 
 /* CARD IMAGE */
@@ -91,7 +91,7 @@ function file(card) {
 }
 
 /* =========================
-   CLICK LOGIC (TURN LOCKED)
+   CLICK LOGIC
 ========================= */
 document.addEventListener("click", (e) => {
 
@@ -100,21 +100,35 @@ document.addEventListener("click", (e) => {
   const me = getMe(state);
   if (!me) return;
 
+  /* SNAP BUTTON */
+  if (e.target.id === "snapBtn") {
+    snapMode = true;
+    return;
+  }
+
+  /* SNAP SELECT */
+  if (snapMode && e.target.dataset.card) {
+    socket.emit("snap", e.target.dataset.card);
+    snapMode = false;
+    return;
+  }
+
+  /* DRAW */
   if (e.target.id === "deck") {
     socket.emit("draw");
     return;
   }
 
+  /* TAKE DISCARD */
   if (e.target.closest("#discard")) {
     const top = state.discard.at(-1);
     socket.emit("takeDiscard", top);
     return;
   }
 
-  const card = e.target.dataset.card;
-
-  if (card && me?.pendingDraw) {
-    socket.emit("swap", card);
+  /* SWAP */
+  if (e.target.dataset.card && me?.pendingDraw) {
+    socket.emit("swap", e.target.dataset.card);
     return;
   }
 });
