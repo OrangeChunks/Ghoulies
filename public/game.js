@@ -1,15 +1,14 @@
 let socket = io();
 let state = null;
 let myId = null;
-let snapMode = false;
 
 socket.emit("join", "room1");
 
-socket.on("you", (id) => {
+socket.on("you",(id)=>{
   myId = id;
 });
 
-socket.on("state", (game) => {
+socket.on("state",(game)=>{
   state = game;
   render();
 });
@@ -60,10 +59,9 @@ function render(){
   document.getElementById("status").innerText = msg;
 
   document.getElementById("hand").innerHTML =
-    me.hand.map(c => {
-      let cls = snapMode ? "card snap" : "card";
-      return `<img src="${file(c)}" class="${cls}" data-card="${c}">`;
-    }).join("");
+    me.hand.map(c =>
+      `<img src="${file(c)}" class="card" data-card="${c}">`
+    ).join("");
 
   const opp = getOpponent(state);
 
@@ -71,9 +69,6 @@ function render(){
     document.getElementById("opponent").innerHTML =
       opp.hand.map(()=> `<div class="card-back"></div>`).join("");
   }
-
-  document.getElementById("snapBtn").style.display =
-    isMyTurn() ? "inline-block" : "none";
 }
 
 /* =========================
@@ -92,7 +87,7 @@ function file(card){
 }
 
 /* =========================
-   CLICK EVENTS
+   CLICK LOGIC
 ========================= */
 document.addEventListener("click",(e)=>{
 
@@ -101,19 +96,8 @@ document.addEventListener("click",(e)=>{
   const me = getMe(state);
   if(!me) return;
 
-  if(e.target.id === "snapBtn"){
-    snapMode = true;
-    return;
-  }
-
   if(e.target.id === "ghouliesBtn"){
     socket.emit("callGhoulies");
-    return;
-  }
-
-  if(snapMode && e.target.dataset.card){
-    socket.emit("snap", e.target.dataset.card);
-    snapMode = false;
     return;
   }
 
@@ -132,4 +116,17 @@ document.addEventListener("click",(e)=>{
     socket.emit("swap", e.target.dataset.card);
     return;
   }
+});
+
+/* =========================
+   DOUBLE CLICK = SNAP
+========================= */
+document.addEventListener("dblclick",(e)=>{
+
+  if(!isMyTurn()) return;
+
+  const card = e.target.dataset.card;
+  if(!card) return;
+
+  socket.emit("snap", card);
 });
