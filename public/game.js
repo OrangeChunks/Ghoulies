@@ -47,7 +47,7 @@ function render(){
   let msg = isMyTurn() ? "Your turn" : "Opponent turn";
 
   if(me.pendingDraw){
-    msg = `Picked up: ${me.pendingDraw}`;
+    msg = `Picked up: ${me.pendingDraw} (click discard to reject or card to swap)`;
   }
 
   document.getElementById("status").innerText = msg;
@@ -79,7 +79,7 @@ function file(card){
 }
 
 /* =========================
-   CLICK EVENTS
+   CLICK LOGIC
 ========================= */
 document.addEventListener("click",(e)=>{
 
@@ -88,22 +88,37 @@ document.addEventListener("click",(e)=>{
   const me = getMe(state);
   if(!me) return;
 
+  /* GHOULIES */
   if(e.target.id === "ghouliesBtn"){
     socket.emit("callGhoulies");
     return;
   }
 
+  /* DRAW */
   if(e.target.id === "deck"){
     socket.emit("draw");
     return;
   }
 
+  /* DISCARD LOGIC */
   if(e.target.closest("#discard")){
+
     const top = state.discard.at(-1);
-    socket.emit("takeDiscard", top);
-    return;
+
+    /* take discard */
+    if(!me.pendingDraw){
+      socket.emit("takeDiscard", top);
+      return;
+    }
+
+    /* reject draw */
+    if(me.pendingDraw){
+      socket.emit("rejectDraw");
+      return;
+    }
   }
 
+  /* SWAP */
   if(e.target.dataset.card && me.pendingDraw){
     socket.emit("swap", e.target.dataset.card);
     return;
@@ -111,7 +126,7 @@ document.addEventListener("click",(e)=>{
 });
 
 /* =========================
-   DOUBLE CLICK = SNAP
+   SNAP (DOUBLE CLICK)
 ========================= */
 document.addEventListener("dblclick",(e)=>{
 

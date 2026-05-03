@@ -39,7 +39,7 @@ function cardValue(card){
 
   if(v === "J" || v === "Q" || v === "K"){
     if(v === "K" && (s === "♥" || s === "♦")){
-      return 0; // red kings
+      return 0;
     }
     return 10;
   }
@@ -72,7 +72,7 @@ function createGame(){
 }
 
 /* =========================
-   SOCKET LOGIC
+   SOCKET
 ========================= */
 io.on("connection",(socket)=>{
 
@@ -113,35 +113,23 @@ io.on("connection",(socket)=>{
     game.turn = (game.turn + 1) % game.order.length;
 
     if(game.ghouliesCalled){
-      endGame(game);
+      game.gameOver = true;
+      game.message = "GAME OVER";
     }
-  }
-
-  function endGame(game){
-    game.gameOver = true;
-
-    const scores = Object.values(game.players).map(p => ({
-      id: p.id,
-      score: handScore(p.hand)
-    }));
-
-    const worst = scores.sort((a,b)=>b.score-a.score)[0];
-
-    game.message = `GAME OVER - Highest score loses`;
   }
 
   /* DRAW */
   socket.on("draw",()=>{
 
     const game = rooms[roomId];
+    const p = game.players[socket.id];
+
     if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
 
-    const p = game.players[socket.id];
-
     p.pendingDraw = game.deck.pop();
 
-    game.message = "Card drawn";
+    game.message = `Picked up ${p.pendingDraw}`;
 
     io.to(roomId).emit("state",game);
   });
@@ -150,10 +138,10 @@ io.on("connection",(socket)=>{
   socket.on("takeDiscard",(card)=>{
 
     const game = rooms[roomId];
+    const p = game.players[socket.id];
+
     if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
-
-    const p = game.players[socket.id];
 
     const top = game.discard.at(-1);
     if(card !== top) return;
@@ -166,14 +154,34 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
+  /* ❌ NEW: REJECT DRAW */
+  socket.on("rejectDraw",()=>{
+
+    const game = rooms[roomId];
+    const p = game.players[socket.id];
+
+    if(!game || game.gameOver) return;
+    if(!p.pendingDraw) return;
+
+    game.discard.push(p.pendingDraw);
+    p.pendingDraw = null;
+
+    game.message = "Card discarded";
+
+    nextTurn(game);
+
+    io.to(roomId).emit("state",game);
+  });
+
   /* SWAP */
   socket.on("swap",(card)=>{
 
     const game = rooms[roomId];
+    const p = game.players[socket.id];
+
     if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
-
-    const p = game.players[socket.id];
+    if(!p.pendingDraw) return;
 
     const i = p.hand.indexOf(card);
     if(i === -1) return;
@@ -194,13 +202,12 @@ io.on("connection",(socket)=>{
   socket.on("snap",(card)=>{
 
     const game = rooms[roomId];
+    const p = game.players[socket.id];
+
     if(!game || game.gameOver) return;
     if(!isMyTurn(game, socket)) return;
 
-    const p = game.players[socket.id];
     const top = game.discard.at(-1);
-
-    if(!card || !top) return;
 
     const v1 = card.slice(0,-1);
     const v2 = top.slice(0,-1);
