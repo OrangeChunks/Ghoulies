@@ -120,6 +120,41 @@ function endRound(game,room){
   io.to(room).emit("state",game);
 }
 
+/* 🔥 RESET GAME (FIX) */
+function resetGame(room){
+  const old = rooms[room];
+  if(!old) return;
+
+  const deck = createDeck();
+
+  rooms[room] = {
+    deck,
+    discard:[deck.pop()],
+    players:old.players,
+    order:old.order,
+    turn:0,
+
+    scores:{},
+    gameOver:false,
+    loser:null,
+
+    roundEnding:false,
+    finalTurns:0,
+    specialMode:null,
+    peekActive:false
+  };
+
+  const g = rooms[room];
+
+  for(const id in g.players){
+    g.players[id].hand = g.deck.splice(0,4);
+    g.players[id].pending = null;
+    g.scores[id] = 0;
+  }
+
+  io.to(room).emit("state",g);
+}
+
 let currentRoom=null;
 
 io.on("connection",(socket)=>{
@@ -207,14 +242,7 @@ io.on("connection",(socket)=>{
       return;
     }
 
-    if(game.roundEnding){
-      game.finalTurns--;
-      if(game.finalTurns<=0){
-        endRound(game,currentRoom);
-        return;
-      }
-    } else nextTurn(game);
-
+    nextTurn(game);
     io.to(currentRoom).emit("state",game);
   });
 
@@ -244,14 +272,7 @@ io.on("connection",(socket)=>{
     p.hand[ownIndex]=temp;
 
     game.specialMode=null;
-
-    if(game.roundEnding){
-      game.finalTurns--;
-      if(game.finalTurns<=0){
-        endRound(game,currentRoom);
-        return;
-      }
-    } else nextTurn(game);
+    nextTurn(game);
 
     io.to(currentRoom).emit("state",game);
   });
@@ -280,6 +301,11 @@ io.on("connection",(socket)=>{
     }
 
     io.to(currentRoom).emit("state",game);
+  });
+
+  /* 🔥 PLAY AGAIN FIX */
+  socket.on("restartGame",(roomId)=>{
+    resetGame(roomId);
   });
 
 });
