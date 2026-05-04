@@ -26,16 +26,20 @@ function render(){
   const p=me();
   const o=opp();
 
-  const ready=Object.keys(state.players).length===2;
   const isTurn=state.order[state.turn]===myId;
 
   document.getElementById("status").innerText =
-    !ready?"Waiting..."
-    :state.phase==="final"?"Final round"
+    state.phase==="final"?"FINAL ROUND"
     :isTurn?"Your turn":"Their turn";
 
-  document.getElementById("drawn").innerHTML =
-    p.pending?`<img src="${file(p.pending)}" class="card">`:"";
+  /* PEAK DISPLAY */
+  if(state.peekActive && p.peek.length){
+    document.getElementById("drawn").innerHTML =
+      p.peek.map(c=>`<img src="${file(c)}" class="card">`).join("");
+  } else {
+    document.getElementById("drawn").innerHTML =
+      p.pending?`<img src="${file(p.pending)}" class="card">`:"";
+  }
 
   const top=state.discard.at(-1);
   document.getElementById("discard").innerHTML =
@@ -52,8 +56,6 @@ function render(){
     html+=`<div>${id===myId?"You":"Opponent"}: ${state.scores[id]}</div>`;
   }
   document.getElementById("scores").innerHTML=html;
-
-  document.getElementById("ghouliesBtn").disabled = state.ghoulies;
 }
 
 /* INPUT */
@@ -67,11 +69,19 @@ document.addEventListener("click",(e)=>{
   if(e.target.id==="deck") socket.emit("draw");
 
   if(e.target.closest("#discard")){
-    if(!p.pending){
-      socket.emit("takeDiscard");
-    } else {
-      socket.emit("reject");
+    if(!p.pending) socket.emit("takeDiscard");
+    else socket.emit("reject");
+  }
+
+  /* 10 RULE FLOW */
+  if(state.specialMode){
+    if(state.specialMode.step===1 && e.target.dataset.card){
+      socket.emit("tenOwn",e.target.dataset.card);
     }
+    else if(state.specialMode.step===2 && e.target.dataset.card){
+      socket.emit("tenOpp",e.target.dataset.card);
+    }
+    return;
   }
 
   if(e.target.dataset.card && p.pending && isTurn){
