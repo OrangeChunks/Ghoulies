@@ -35,10 +35,10 @@ function cardValue(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
 
-  if(v === "A") return 1;
+  if(v==="A") return 1;
 
-  if(v === "J" || v === "Q" || v === "K"){
-    if(v === "K" && (s === "♥" || s === "♦")) return 0;
+  if(v==="J"||v==="Q"||v==="K"){
+    if(v==="K"&&(s==="♥"||s==="♦")) return 0;
     return 10;
   }
 
@@ -50,13 +50,12 @@ function handScore(hand){
 }
 
 /* =========================
-   GAME STATE
+   STATE
 ========================= */
 const rooms = {};
 
 function createGame(){
   const deck = createDeck();
-
   return {
     deck,
     discard:[deck.pop()],
@@ -66,22 +65,19 @@ function createGame(){
     scores:{},
     message:"Waiting for opponent...",
     finalRound:false,
-    finalPlayer:null
+    finalPlayer:null,
+    showingScores:false
   };
 }
 
-/* =========================
-   HELPERS
-========================= */
 function hasTwoPlayers(game){
-  return Object.keys(game.players).length === 2;
+  return Object.keys(game.players).length===2;
 }
 
 function nextTurn(game){
-  game.turn = (game.turn + 1) % game.order.length;
+  game.turn = (game.turn+1)%game.order.length;
 }
 
-/* RESET ROUND */
 function resetRound(game){
   const deck = createDeck();
 
@@ -89,6 +85,7 @@ function resetRound(game){
   game.discard = [deck.pop()];
   game.finalRound = false;
   game.finalPlayer = null;
+  game.showingScores = false;
 
   Object.values(game.players).forEach(p=>{
     p.hand = deck.splice(0,4);
@@ -101,85 +98,69 @@ function resetRound(game){
 ========================= */
 io.on("connection",(socket)=>{
 
-  let roomId = null;
+  let roomId=null;
 
   socket.on("join",(id)=>{
 
-    roomId = id;
+    roomId=id;
 
-    if(!rooms[roomId]){
-      rooms[roomId] = createGame();
-    }
+    if(!rooms[id]) rooms[id]=createGame();
+    const game=rooms[id];
 
-    const game = rooms[roomId];
-
-    if(Object.keys(game.players).length < 2){
-
-      game.players[socket.id] = {
-        id: socket.id,
-        hand: game.deck.splice(0,4),
-        pendingDraw: null
+    if(Object.keys(game.players).length<2){
+      game.players[socket.id]={
+        id:socket.id,
+        hand:game.deck.splice(0,4),
+        pendingDraw:null
       };
-
       game.order.push(socket.id);
+      game.scores[socket.id]=0;
     }
 
-    socket.join(roomId);
+    socket.join(id);
 
-    if(hasTwoPlayers(game)){
-      game.message = "Game started!";
-    }
-
-    socket.emit("you", socket.id);
-    io.to(roomId).emit("state",game);
+    socket.emit("you",socket.id);
+    io.to(id).emit("state",game);
   });
 
-  function isMyTurn(game, socket){
-    return game.order[game.turn] === socket.id;
+  function isMyTurn(game){
+    return game.order[game.turn]===socket.id;
   }
 
   /* DRAW */
   socket.on("draw",()=>{
-    const game = rooms[roomId];
-    if(!game || !hasTwoPlayers(game)) return;
-    if(!isMyTurn(game, socket)) return;
+    const game=rooms[roomId];
+    if(!game||!hasTwoPlayers(game)||!isMyTurn(game)||game.showingScores) return;
 
-    const p = game.players[socket.id];
-    p.pendingDraw = game.deck.pop();
-
+    game.players[socket.id].pendingDraw=game.deck.pop();
     io.to(roomId).emit("state",game);
   });
 
   /* TAKE DISCARD */
   socket.on("takeDiscard",(card)=>{
-    const game = rooms[roomId];
-    if(!hasTwoPlayers(game)) return;
-    if(!isMyTurn(game, socket)) return;
+    const game=rooms[roomId];
+    if(!hasTwoPlayers(game)||!isMyTurn(game)||game.showingScores) return;
 
-    const p = game.players[socket.id];
-    const top = game.discard.at(-1);
-
-    if(card !== top) return;
+    const top=game.discard.at(-1);
+    if(card!==top) return;
 
     game.discard.pop();
-    p.pendingDraw = top;
+    game.players[socket.id].pendingDraw=top;
 
     io.to(roomId).emit("state",game);
   });
 
   /* REJECT */
   socket.on("rejectDraw",()=>{
-    const game = rooms[roomId];
-    if(!hasTwoPlayers(game)) return;
-    if(!isMyTurn(game, socket)) return;
+    const game=rooms[roomId];
+    if(!hasTwoPlayers(game)||!isMyTurn(game)||game.showingScores) return;
 
-    const p = game.players[socket.id];
+    const p=game.players[socket.id];
 
     game.discard.push(p.pendingDraw);
-    p.pendingDraw = null;
+    p.pendingDraw=null;
 
-    /* 🔥 FINAL ROUND CHECK */
-    if(game.finalRound && socket.id === game.finalPlayer){
+    if(game.finalRound && socket.id===game.finalPlayer){
       endRound(game);
       return;
     }
@@ -190,22 +171,20 @@ io.on("connection",(socket)=>{
 
   /* SWAP */
   socket.on("swap",(card)=>{
-    const game = rooms[roomId];
-    if(!hasTwoPlayers(game)) return;
-    if(!isMyTurn(game, socket)) return;
+    const game=rooms[roomId];
+    if(!hasTwoPlayers(game)||!isMyTurn(game)||game.showingScores) return;
 
-    const p = game.players[socket.id];
-    const i = p.hand.indexOf(card);
-    if(i === -1) return;
+    const p=game.players[socket.id];
+    const i=p.hand.indexOf(card);
+    if(i===-1) return;
 
-    const old = p.hand[i];
+    const old=p.hand[i];
 
-    p.hand[i] = p.pendingDraw;
+    p.hand[i]=p.pendingDraw;
     game.discard.push(old);
-    p.pendingDraw = null;
+    p.pendingDraw=null;
 
-    /* 🔥 FINAL ROUND CHECK */
-    if(game.finalRound && socket.id === game.finalPlayer){
+    if(game.finalRound && socket.id===game.finalPlayer){
       endRound(game);
       return;
     }
@@ -216,30 +195,32 @@ io.on("connection",(socket)=>{
 
   function endRound(game){
 
-    /* CALCULATE SCORES */
+    game.showingScores = true;
+
     Object.values(game.players).forEach(p=>{
-      game.scores[p.id] = (game.scores[p.id] || 0) + handScore(p.hand);
+      game.scores[p.id] += handScore(p.hand);
     });
 
-    game.message = "Round over! Scores updated.";
-
-    resetRound(game);
+    game.message = "Round over!";
 
     io.to(roomId).emit("state",game);
+
+    setTimeout(()=>{
+      resetRound(game);
+      io.to(roomId).emit("state",game);
+    },3000);
   }
 
   /* SNAP */
   socket.on("snap",(card)=>{
-    const game = rooms[roomId];
+    const game=rooms[roomId];
     if(!game) return;
 
-    const p = game.players[socket.id];
-    const top = game.discard.at(-1);
+    const p=game.players[socket.id];
+    const top=game.discard.at(-1);
 
-    if(!card || !top) return;
-
-    if(card.slice(0,-1) === top.slice(0,-1)){
-      p.hand = p.hand.filter(c=>c!==card);
+    if(card && top && card.slice(0,-1)===top.slice(0,-1)){
+      p.hand=p.hand.filter(c=>c!==card);
       game.discard.push(card);
     }
 
@@ -248,22 +229,17 @@ io.on("connection",(socket)=>{
 
   /* GHOULIES */
   socket.on("callGhoulies",()=>{
-    const game = rooms[roomId];
-    if(!game || !hasTwoPlayers(game)) return;
+    const game=rooms[roomId];
+    if(!game||!hasTwoPlayers(game)||game.showingScores) return;
 
-    game.finalRound = true;
-
-    /* NEXT PLAYER IS FINAL PLAYER */
+    game.finalRound=true;
     nextTurn(game);
-    game.finalPlayer = game.order[game.turn];
+    game.finalPlayer=game.order[game.turn];
 
-    game.message = "👻 Final turn for opponent!";
-
+    game.message="👻 Final turn!";
     io.to(roomId).emit("state",game);
   });
 
 });
 
-server.listen(process.env.PORT || 3000, () => {
-  console.log("Server running");
-});
+server.listen(process.env.PORT||3000,()=>console.log("Server running"));

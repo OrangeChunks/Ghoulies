@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ghoulies</title>
 
 <style>
@@ -8,10 +9,18 @@ body {
   background:#0b3d2e;
   color:white;
   font-family:Arial;
+  margin:0;
 }
 
 #container{
   display:flex;
+  flex-direction:column;
+}
+
+@media(min-width:700px){
+  #container{
+    flex-direction:row;
+  }
 }
 
 #game{
@@ -21,19 +30,35 @@ body {
 
 #scores{
   flex:1;
-  padding:20px;
+  padding:15px;
   border-left:2px solid white;
 }
 
 .card{
-  width:80px;
+  width:70px;
   cursor:pointer;
+  transition:0.2s;
+}
+
+.card:hover{
+  transform:scale(1.1);
+}
+
+@media(min-width:700px){
+  .card{ width:90px; }
 }
 
 #hand,#opponent{
   display:flex;
   justify-content:center;
-  gap:10px;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+button{
+  padding:12px;
+  font-size:16px;
+  margin:10px;
 }
 </style>
 </head>
@@ -46,16 +71,16 @@ body {
 
 <h1>Ghoulies</h1>
 
-<div id="board">
-<img id="deck" src="/cards/back.png" class="card">
-<div id="discard"></div>
+<div>
+  <img id="deck" src="/cards/back.png" class="card">
+  <div id="discard"></div>
 </div>
 
 <h2 id="status"></h2>
 
 <div id="drawn"></div>
 
-<button id="ghouliesBtn">Call Ghoulies</button>
+<button id="ghouliesBtn">Call Ghoulies 👻</button>
 
 <h3>Opponent</h3>
 <div id="opponent"></div>
