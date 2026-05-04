@@ -178,8 +178,13 @@ io.on("connection",(socket)=>{
     game.discard.push(p.pendingDraw);
     p.pendingDraw = null;
 
-    nextTurn(game);
+    /* 🔥 FINAL ROUND CHECK */
+    if(game.finalRound && socket.id === game.finalPlayer){
+      endRound(game);
+      return;
+    }
 
+    nextTurn(game);
     io.to(roomId).emit("state",game);
   });
 
@@ -191,7 +196,6 @@ io.on("connection",(socket)=>{
 
     const p = game.players[socket.id];
     const i = p.hand.indexOf(card);
-
     if(i === -1) return;
 
     const old = p.hand[i];
@@ -200,22 +204,29 @@ io.on("connection",(socket)=>{
     game.discard.push(old);
     p.pendingDraw = null;
 
-    nextTurn(game);
-
-    /* FINAL ROUND CHECK */
-    if(game.finalRound && game.order[game.turn] === game.finalPlayer){
-
-      Object.values(game.players).forEach(pl=>{
-        game.scores[pl.id] = handScore(pl.hand);
-      });
-
-      game.message = "Round complete - scores updated";
-
-      resetRound(game);
+    /* 🔥 FINAL ROUND CHECK */
+    if(game.finalRound && socket.id === game.finalPlayer){
+      endRound(game);
+      return;
     }
 
+    nextTurn(game);
     io.to(roomId).emit("state",game);
   });
+
+  function endRound(game){
+
+    /* CALCULATE SCORES */
+    Object.values(game.players).forEach(p=>{
+      game.scores[p.id] = (game.scores[p.id] || 0) + handScore(p.hand);
+    });
+
+    game.message = "Round over! Scores updated.";
+
+    resetRound(game);
+
+    io.to(roomId).emit("state",game);
+  }
 
   /* SNAP */
   socket.on("snap",(card)=>{
@@ -242,11 +253,11 @@ io.on("connection",(socket)=>{
 
     game.finalRound = true;
 
-    // next player gets final turn
+    /* NEXT PLAYER IS FINAL PLAYER */
     nextTurn(game);
     game.finalPlayer = game.order[game.turn];
 
-    game.message = "👻 Final turn!";
+    game.message = "👻 Final turn for opponent!";
 
     io.to(roomId).emit("state",game);
   });
