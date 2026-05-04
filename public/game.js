@@ -4,9 +4,7 @@ let myId = null;
 
 socket.emit("join","room1");
 
-socket.on("you",(id)=> {
-  myId = id;
-});
+socket.on("you",(id)=> myId = id);
 
 socket.on("state",(game)=>{
   state = game;
@@ -14,15 +12,13 @@ socket.on("state",(game)=>{
 });
 
 function me(){
-  if(!state || !myId) return null;
-  return state.players[myId];
+  return state?.players?.[myId];
 }
 
 function opp(){
   return Object.values(state.players).find(p=>p.id!==myId);
 }
 
-/* CARD IMAGE */
 function file(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
@@ -42,27 +38,26 @@ function render(){
   if(!p) return;
 
   const isTurn = state.order[state.turn] === myId;
+  const ready = Object.keys(state.players).length === 2;
 
-  /* TURN TEXT */
   document.getElementById("status").innerText =
-    isTurn ? "🎯 Your turn" : "⏳ Their turn";
+    !ready
+      ? "⏳ Waiting for opponent..."
+      : isTurn
+        ? "🎯 Your turn"
+        : "⏳ Their turn";
 
-  /* SHOW DRAWN CARD (KEY FIX) */
+  /* DRAWN CARD */
   const drawArea = document.getElementById("drawn");
 
   if(p.pendingDraw){
-    drawArea.innerHTML = `
-      <div>Picked up:</div>
-      <img src="${file(p.pendingDraw)}" class="card">
-      <div style="font-size:12px;">(Click discard to drop it, or click a card to swap)</div>
-    `;
+    drawArea.innerHTML = `<img src="${file(p.pendingDraw)}" class="card">`;
   } else {
     drawArea.innerHTML = "";
   }
 
   /* DISCARD */
   const top = state.discard.at(-1);
-
   document.getElementById("discard").innerHTML =
     top ? `<img src="${file(top)}" class="card">` : "";
 
@@ -76,13 +71,6 @@ function render(){
   const o = opp();
   document.getElementById("opponent").innerHTML =
     o ? o.hand.map(()=>`<img src="/cards/back.png" class="card">`).join("") : "";
-
-  /* SCORES */
-  let html = "<h3>Scores</h3>";
-  for(const id in state.scores){
-    html += `<div>${id===myId?"You":"Opponent"}: ${state.scores[id]}</div>`;
-  }
-  document.getElementById("scores").innerHTML = html;
 }
 
 /* CLICK */
@@ -93,45 +81,40 @@ document.addEventListener("click",(e)=>{
   const p = me();
   if(!p) return;
 
-  /* GHOULIES ALWAYS WORKS */
+  const ready = Object.keys(state.players).length === 2;
+
+  /* GHOULIES (ONLY WHEN READY) */
   if(e.target.id === "ghouliesBtn"){
-    socket.emit("callGhoulies");
+    if(ready) socket.emit("callGhoulies");
     return;
   }
 
   const isTurn = state.order[state.turn] === myId;
-  if(!isTurn) return;
 
-  /* DRAW */
+  /* BLOCK IF NOT READY OR NOT TURN */
+  if(!ready || !isTurn) return;
+
   if(e.target.id === "deck"){
     socket.emit("draw");
-    return;
   }
 
-  /* DISCARD */
   if(e.target.closest("#discard")){
-
     const top = state.discard.at(-1);
 
     if(!p.pendingDraw){
-      socket.emit("takeDiscard", top);
+      socket.emit("takeDiscard",top);
     } else {
       socket.emit("rejectDraw");
     }
-
-    return;
   }
 
-  /* SWAP */
   if(e.target.dataset.card && p.pendingDraw){
-    socket.emit("swap", e.target.dataset.card);
+    socket.emit("swap",e.target.dataset.card);
   }
 });
 
-/* SNAP */
+/* SNAP ALWAYS WORKS */
 document.addEventListener("dblclick",(e)=>{
-
-  if(!state) return;
 
   const card = e.target.dataset.card;
   if(!card) return;
