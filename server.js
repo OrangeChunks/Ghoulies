@@ -25,9 +25,10 @@ function createDeck(){
   return shuffle(d);
 }
 
-function cardValue(c){
-  const v=c.slice(0,-1);
-  const s=c.slice(-1);
+/* SCORE */
+function value(card){
+  const v = card.slice(0,-1);
+  const s = card.slice(-1);
 
   if(v==="A") return 1;
   if(v==="J"||v==="Q"||v==="K"){
@@ -37,30 +38,20 @@ function cardValue(c){
   return parseInt(v);
 }
 
-function handScore(h){
-  return h.reduce((a,c)=>a+cardValue(c),0);
-}
-
 const rooms={};
 
 function createGame(){
   const deck=createDeck();
-
   return {
     deck,
     discard:[deck.pop()],
     players:{},
     order:[],
     turn:0,
-    scores:{},
-
     phase:"normal",
-
     ghoulies:false,
-
-    /* IMPORTANT STATE */
-    specialMode:null,   // 10 rule flow
-    peekActive:false
+    peekActive:false,
+    specialMode:null
   };
 }
 
@@ -68,26 +59,36 @@ function has2(g){
   return Object.keys(g.players).length===2;
 }
 
+function canAct(g){
+  if(!g) return false;
+  if(Object.keys(g.players).length!==2) return false;
+  if(g.peekActive) return false;
+  return true;
+}
+
 function nextTurn(g){
   g.turn=(g.turn+1)%g.order.length;
 }
 
-/* 👀 PEAK SYSTEM */
+/* 👀 PEEK FIX (REVEAL FIRST 2 CARDS) */
 function startPeek(room,g){
   g.peekActive=true;
 
   Object.values(g.players).forEach(p=>{
-    p.peek=[
-      p.hand[Math.floor(Math.random()*p.hand.length)],
-      p.hand[Math.floor(Math.random()*p.hand.length)]
-    ];
+    p.peek = [p.hand[0], p.hand[1]];
+    p.revealed = true;
   });
 
   io.to(room).emit("state",g);
 
   setTimeout(()=>{
     g.peekActive=false;
-    Object.values(g.players).forEach(p=>p.peek=[]);
+
+    Object.values(g.players).forEach(p=>{
+      p.peek=[];
+      p.revealed=false;
+    });
+
     io.to(room).emit("state",g);
   },3000);
 }
@@ -106,11 +107,11 @@ io.on("connection",(socket)=>{
       g.players[socket.id]={
         hand:g.deck.splice(0,4),
         pending:null,
-        peek:[]
+        peek:[],
+        revealed:false
       };
 
       g.order.push(socket.id);
-      g.scores[socket.id]=0;
     }
 
     socket.join(id);
@@ -126,19 +127,21 @@ io.on("connection",(socket)=>{
   /* DRAW */
   socket.on("draw",()=>{
     const game=g();
-    if(!game||!has2(game)||game.phase!=="normal") return;
+    if(!canAct(game)||!isTurn()) return;
 
-    game.players[socket.id].pending=game.deck.pop();
+    game.players[socket.id].pending = game.deck.pop();
     io.to(currentRoom).emit("state",game);
   });
 
-  /* DISCARD PICK */
+  /* TAKE DISCARD */
   socket.on("takeDiscard",()=>{
     const game=g();
+    if(!canAct(game)) return;
+
     const p=game.players[socket.id];
 
     if(!p.pending && game.discard.length){
-      p.pending=game.discard.pop();
+      p.pending = game.discard.pop();
     }
 
     io.to(currentRoom).emit("state",game);
@@ -160,6 +163,8 @@ io.on("connection",(socket)=>{
   /* SWAP + 10 RULE */
   socket.on("swap",(card)=>{
     const game=g();
+    if(!canAct(game)||!isTurn()) return;
+
     const p=game.players[socket.id];
 
     const i=p.hand.indexOf(card);
@@ -171,7 +176,7 @@ io.on("connection",(socket)=>{
     game.discard.push(old);
     p.pending=null;
 
-    /* 🔥 10 RULE ACTIVATION */
+    /* 10 RULE */
     if(old.startsWith("10")){
       game.specialMode={
         player:socket.id,
@@ -185,7 +190,7 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* 🔥 10 RULE STEP 1 */
+  /* 10 RULE STEP 1 */
   socket.on("tenOwn",(card)=>{
     const game=g();
     if(!game.specialMode) return;
@@ -196,12 +201,12 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* 🔥 10 RULE STEP 2 */
+  /* 10 RULE STEP 2 */
   socket.on("tenOpp",(card)=>{
     const game=g();
     const p=game.players[socket.id];
 
-    const opp=Object.values(game.players).find(x=>x.id!==socket.id);
+    const opp=Object.values(game.players).find(x=>x!==p);
     const i=opp.hand.indexOf(card);
 
     if(i===-1) return;
@@ -218,10 +223,10 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* GHOULIES FIXED */
+  /* GHOULIES */
   socket.on("callGhoulies",()=>{
     const game=g();
-    if(!game||game.ghoulies) return;
+    if(game.ghoulies) return;
 
     game.ghoulies=true;
     game.phase="final";
