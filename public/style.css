@@ -1,71 +1,94 @@
-body {
-  background: #0f172a;
-  color: white;
-  text-align: center;
-  font-family: sans-serif;
+body{
+  text-align:center;
+  font-family:sans-serif;
+  background:#0f172a;
+  color:white;
+  margin:0;
 }
 
-/* =========================
-   BOARD
-========================= */
-#board {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
-  margin: 20px;
-  align-items: center;
+#center{
+  display:flex;
+  justify-content:center;
+  gap:30px;
+  margin:20px;
 }
 
-/* =========================
-   CARD BASE
-========================= */
-.card {
-  width: 92px;
-  height: 132px;
-  margin: 6px;
-  cursor: pointer;
-  transition: 0.2s;
+.card{
+  width:70px;
+  transition:transform 0.2s, box-shadow 0.2s;
 }
 
-.card:hover {
-  transform: translateY(-6px);
+.card:hover{
+  transform:translateY(-8px) scale(1.05);
+  box-shadow:0 5px 15px rgba(0,0,0,0.5);
 }
 
-/* =========================
-   DISCARD IMAGE
-========================= */
-#discard img {
-  width: 92px;
-  height: 132px;
+#hand, #opponentHand{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  margin:10px;
 }
 
-/* =========================
-   DECK (FORCED BACK IMAGE)
-   🔥 THIS IS THE IMPORTANT FIX
-========================= */
-#deck {
-  width: 92px !important;
-  height: 132px !important;
-
-  background-image: url("/cards/back.png") !important;
-  background-size: cover !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
-
-  border-radius: 8px;
-  cursor: pointer;
-
-  display: block;
+#deck img{
+  width:80px;
+  cursor:pointer;
 }
 
-/* hover animation */
-#deck:hover {
-  transform: translateY(-6px);
+#discard img{
+  width:80px;
 }
 
-/* =========================
-   STATUS
-========================= */
-#status {
-  margin-top: 10px;
+#ghouliesBtn{
+  padding:10px 20px;
+  margin-top:10px;
+  font-size:16px;
+  cursor:pointer;
+}
+
+#scores{
+  position:fixed;
+  right:10px;
+  top:10px;
+  text-align:right;
+}
+
+#endScreen{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.9);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.hidden{
+  display:none;
+}
+
+#endText{
+  font-size:40px;
+}
+
+/* 📱 MOBILE */
+@media (max-width:600px){
+
+  .card{
+    width:50px;
+  }
+
+  #center{
+    gap:10px;
+  }
+
+  #deck img, #discard img{
+    width:60px;
+  }
+
+  #ghouliesBtn{
+    width:80%;
+  }
 }
