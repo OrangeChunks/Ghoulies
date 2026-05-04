@@ -11,9 +11,7 @@ app.use(express.static("public"));
 const SUITS = ["♠","♥","♦","♣"];
 const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
-function shuffle(a){
-  return a.sort(()=>Math.random()-0.5);
-}
+function shuffle(a){ return a.sort(()=>Math.random()-0.5); }
 
 function createDeck(){
   let d=[];
@@ -49,9 +47,6 @@ function createGame(){
     order:[],
     turn:0,
 
-    phase:"normal",
-
-    ghoulies:false,
     roundEnding:false,
     finalTurns:0,
 
@@ -60,21 +55,9 @@ function createGame(){
   };
 }
 
-function has2(g){
-  return Object.keys(g.players).length===2;
-}
+function has2(g){ return Object.keys(g.players).length===2; }
+function nextTurn(g){ g.turn=(g.turn+1)%g.order.length; }
 
-function canAct(g){
-  if(!g) return false;
-  if(Object.keys(g.players).length!==2) return false;
-  return true;
-}
-
-function nextTurn(g){
-  g.turn=(g.turn+1)%g.order.length;
-}
-
-/* 👀 PEEK */
 function startPeek(room,g){
   g.peekActive=true;
 
@@ -87,17 +70,14 @@ function startPeek(room,g){
 
   setTimeout(()=>{
     g.peekActive=false;
-
     Object.values(g.players).forEach(p=>{
       p.peek=[];
       p.revealed=false;
     });
-
     io.to(room).emit("state",g);
   },3000);
 }
 
-/* 🧠 ROUND RESET */
 function endRound(game,room){
 
   for(const id in game.players){
@@ -112,14 +92,11 @@ function endRound(game,room){
 
   game.roundEnding=false;
   game.finalTurns=0;
-  game.ghoulies=false;
   game.specialMode=null;
 
   for(const id in game.players){
     game.players[id].hand=deck.splice(0,4);
     game.players[id].pending=null;
-    game.players[id].peek=[];
-    game.players[id].revealed=false;
   }
 
   game.turn=0;
@@ -160,22 +137,21 @@ io.on("connection",(socket)=>{
   });
 
   const g=()=>rooms[currentRoom];
-
   const isTurn=()=>g().order[g().turn]===socket.id;
 
   /* DRAW */
   socket.on("draw",()=>{
     const game=g();
-    if(!canAct(game)) return;
-    if(!isTurn()) return;
+    if(!has2(game)||!isTurn()||game.peekActive||game.specialMode) return;
 
     game.players[socket.id].pending=game.deck.pop();
     io.to(currentRoom).emit("state",game);
   });
 
+  /* DISCARD */
   socket.on("takeDiscard",()=>{
     const game=g();
-    if(!canAct(game)) return;
+    if(!has2(game)||game.specialMode) return;
 
     const p=game.players[socket.id];
 
@@ -198,33 +174,30 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* 🔥 FIXED SWAP WITH EXPLICIT 10 DETECTION */
+  /* SWAP */
   socket.on("swap",(card)=>{
     const game=g();
-    if(!canAct(game)||!isTurn()) return;
+    if(!has2(game)||!isTurn()||game.specialMode) return;
 
     const p=game.players[socket.id];
 
     const i=p.hand.indexOf(card);
     if(i===-1) return;
 
-    const drawn=p.pending;
-    const swappedCard=p.hand[i];
+    const old=p.hand[i];
 
-    /* detect 10 BEFORE mutation */
-    const isTen = swappedCard === "10♠" || swappedCard==="10♥" || swappedCard==="10♦" || swappedCard==="10♣"
-                  || swappedCard.startsWith("10");
-
-    p.hand[i]=drawn;
-    game.discard.push(swappedCard);
+    p.hand[i]=p.pending;
+    game.discard.push(old);
     p.pending=null;
 
-    if(isTen){
+    /* 10 RULE */
+    if(old.startsWith("10")){
       game.specialMode={
         player:socket.id,
         step:1,
-        card:swappedCard
+        selectedOwn:null
       };
+
       io.to(currentRoom).emit("state",game);
       return;
     }
@@ -242,10 +215,10 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* 10 RULE */
+  /* 10 STEP 1 */
   socket.on("tenOwn",(card)=>{
     const game=g();
-    if(!game.specialMode) return;
+    if(!game.specialMode || game.specialMode.player!==socket.id) return;
 
     game.specialMode.selectedOwn=card;
     game.specialMode.step=2;
@@ -253,23 +226,35 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
+  /* 🔥 FIXED 10 STEP 2 (TURN ADVANCES HERE) */
   socket.on("tenOpp",(card)=>{
     const game=g();
-    const p=game.players[socket.id];
+    if(!game.specialMode) return;
 
+    const p=game.players[game.specialMode.player];
     const opp=Object.values(game.players).find(x=>x!==p);
-    const i=opp.hand.indexOf(card);
 
+    const i=opp.hand.indexOf(card);
     if(i===-1) return;
 
     const temp=opp.hand[i];
-
     opp.hand[i]=game.specialMode.selectedOwn;
 
-    p.hand=p.hand.filter(c=>c!==game.specialMode.selectedOwn);
-    p.hand.push(temp);
+    const ownIndex=p.hand.indexOf(game.specialMode.selectedOwn);
+    p.hand[ownIndex]=temp;
 
     game.specialMode=null;
+
+    /* ✅ FIX: TURN HANDOFF HERE */
+    if(game.roundEnding){
+      game.finalTurns--;
+      if(game.finalTurns<=0){
+        endRound(game,currentRoom);
+        return;
+      }
+    } else {
+      nextTurn(game);  // ← THIS WAS THE MISSING PIECE
+    }
 
     io.to(currentRoom).emit("state",game);
   });
@@ -277,9 +262,8 @@ io.on("connection",(socket)=>{
   /* GHOULIES */
   socket.on("callGhoulies",()=>{
     const game=g();
-    if(game.ghoulies) return;
+    if(game.roundEnding) return;
 
-    game.ghoulies=true;
     game.roundEnding=true;
     game.finalTurns=1;
 
