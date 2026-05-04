@@ -25,7 +25,6 @@ function createDeck(){
   return shuffle(d);
 }
 
-/* SCORE */
 function value(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
@@ -42,16 +41,22 @@ const rooms={};
 
 function createGame(){
   const deck=createDeck();
+
   return {
     deck,
     discard:[deck.pop()],
     players:{},
     order:[],
     turn:0,
+
     phase:"normal",
+
     ghoulies:false,
-    peekActive:false,
-    specialMode:null
+    roundEnding:false,
+    finalTurns:0,
+
+    specialMode:null,
+    peekActive:false
   };
 }
 
@@ -62,7 +67,6 @@ function has2(g){
 function canAct(g){
   if(!g) return false;
   if(Object.keys(g.players).length!==2) return false;
-  if(g.peekActive) return false;
   return true;
 }
 
@@ -70,13 +74,13 @@ function nextTurn(g){
   g.turn=(g.turn+1)%g.order.length;
 }
 
-/* 👀 PEEK FIX (REVEAL FIRST 2 CARDS) */
+/* 👀 PEEK */
 function startPeek(room,g){
   g.peekActive=true;
 
   Object.values(g.players).forEach(p=>{
-    p.peek = [p.hand[0], p.hand[1]];
-    p.revealed = true;
+    p.peek=[p.hand[0],p.hand[1]];
+    p.revealed=true;
   });
 
   io.to(room).emit("state",g);
@@ -91,6 +95,38 @@ function startPeek(room,g){
 
     io.to(room).emit("state",g);
   },3000);
+}
+
+/* 🧠 ROUND RESET */
+function endRound(game,room){
+
+  for(const id in game.players){
+    game.scores[id] = (game.scores[id]||0) +
+      game.players[id].hand.reduce((a,c)=>a+value(c),0);
+  }
+
+  const deck=createDeck();
+
+  game.deck=deck;
+  game.discard=[deck.pop()];
+
+  game.roundEnding=false;
+  game.finalTurns=0;
+  game.ghoulies=false;
+  game.specialMode=null;
+
+  for(const id in game.players){
+    game.players[id].hand = deck.splice(0,4);
+    game.players[id].pending=null;
+    game.players[id].peek=[];
+    game.players[id].revealed=false;
+  }
+
+  game.turn=0;
+
+  startPeek(room,game);
+
+  io.to(room).emit("state",game);
 }
 
 let currentRoom=null;
@@ -112,6 +148,8 @@ io.on("connection",(socket)=>{
       };
 
       g.order.push(socket.id);
+      g.scores = g.scores || {};
+      g.scores[socket.id]=0;
     }
 
     socket.join(id);
@@ -122,18 +160,20 @@ io.on("connection",(socket)=>{
   });
 
   const g=()=>rooms[currentRoom];
+
   const isTurn=()=>g().order[g().turn]===socket.id;
 
   /* DRAW */
   socket.on("draw",()=>{
     const game=g();
-    if(!canAct(game)||!isTurn()) return;
+    if(!canAct(game)) return;
+    if(!isTurn()) return;
 
-    game.players[socket.id].pending = game.deck.pop();
+    game.players[socket.id].pending=game.deck.pop();
     io.to(currentRoom).emit("state",game);
   });
 
-  /* TAKE DISCARD */
+  /* DISCARD */
   socket.on("takeDiscard",()=>{
     const game=g();
     if(!canAct(game)) return;
@@ -141,13 +181,12 @@ io.on("connection",(socket)=>{
     const p=game.players[socket.id];
 
     if(!p.pending && game.discard.length){
-      p.pending = game.discard.pop();
+      p.pending=game.discard.pop();
     }
 
     io.to(currentRoom).emit("state",game);
   });
 
-  /* REJECT */
   socket.on("reject",()=>{
     const game=g();
     const p=game.players[socket.id];
@@ -160,7 +199,7 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* SWAP + 10 RULE */
+  /* 🔥 SWAP + 10 FIX */
   socket.on("swap",(card)=>{
     const game=g();
     if(!canAct(game)||!isTurn()) return;
@@ -176,13 +215,25 @@ io.on("connection",(socket)=>{
     game.discard.push(old);
     p.pending=null;
 
-    /* 10 RULE */
+    /* 10 RULE FIXED */
     if(old.startsWith("10")){
       game.specialMode={
         player:socket.id,
         step:1,
         card:old
       };
+      io.to(currentRoom).emit("state",game);
+      return;
+    }
+
+    /* TURN LOGIC */
+    if(game.roundEnding){
+      game.finalTurns--;
+
+      if(game.finalTurns<=0){
+        endRound(game,currentRoom);
+        return;
+      }
     } else {
       nextTurn(game);
     }
@@ -190,7 +241,7 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* 10 RULE STEP 1 */
+  /* 10 STEP 1 */
   socket.on("tenOwn",(card)=>{
     const game=g();
     if(!game.specialMode) return;
@@ -201,7 +252,7 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* 10 RULE STEP 2 */
+  /* 10 STEP 2 */
   socket.on("tenOpp",(card)=>{
     const game=g();
     const p=game.players[socket.id];
@@ -223,13 +274,16 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* GHOULIES */
+  /* GHOULIES FIXED */
   socket.on("callGhoulies",()=>{
     const game=g();
     if(game.ghoulies) return;
 
     game.ghoulies=true;
-    game.phase="final";
+    game.roundEnding=true;
+
+    /* CURRENT PLAYER FINISHES, OPP GETS 1 TURN */
+    game.finalTurns=1;
 
     nextTurn(game);
 
