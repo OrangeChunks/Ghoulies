@@ -24,7 +24,7 @@ function createDeck(){
 }
 
 /* SCORE */
-function cardValue(c){
+function val(c){
   const v=c.slice(0,-1);
   const s=c.slice(-1);
 
@@ -36,13 +36,13 @@ function cardValue(c){
   return parseInt(v);
 }
 
-function handScore(h){
-  return h.reduce((a,c)=>a+cardValue(c),0);
+function score(h){
+  return h.reduce((a,c)=>a+val(c),0);
 }
 
 const rooms={};
 
-function createGame(){
+function game(){
   const deck=createDeck();
   return {
     deck,
@@ -51,21 +51,15 @@ function createGame(){
     order:[],
     turn:0,
     scores:{},
-    message:"",
-    ghouliesCalled:false,
-    finalRound:false,
-    finalPlayer:null,
-    showingScores:false,
-
-    /* NEW */
-    specialSwap:null,
+    ghoulies:false,
+    phase:"normal", // normal | final | showing
     peek:false
   };
 }
 
 function has2(g){return Object.keys(g.players).length===2;}
 
-function nextTurn(g){
+function next(g){
   g.turn=(g.turn+1)%g.order.length;
 }
 
@@ -73,7 +67,7 @@ function resetPeek(g){
   g.peek=true;
 
   Object.values(g.players).forEach(p=>{
-    p.peekCards = [
+    p.peekCards=[
       p.hand[Math.floor(Math.random()*p.hand.length)],
       p.hand[Math.floor(Math.random()*p.hand.length)]
     ];
@@ -82,27 +76,27 @@ function resetPeek(g){
   setTimeout(()=>{
     g.peek=false;
     Object.values(g.players).forEach(p=>p.peekCards=[]);
-    io.to(currentRoom).emit("state",g);
+    io.to(room).emit("state",g);
   },3000);
 }
 
-let currentRoom=null;
+let room=null;
 
 io.on("connection",(socket)=>{
 
   socket.on("join",(id)=>{
-    currentRoom=id;
+    room=id;
 
-    if(!rooms[id]) rooms[id]=createGame();
+    if(!rooms[id]) rooms[id]=game();
     const g=rooms[id];
 
     if(Object.keys(g.players).length<2){
       g.players[socket.id]={
         hand:g.deck.splice(0,4),
-        pendingDraw:null,
-        peekCards:[],
-        swapState:null
+        pending:null,
+        peekCards:[]
       };
+
       g.order.push(socket.id);
       g.scores[socket.id]=0;
     }
@@ -114,16 +108,41 @@ io.on("connection",(socket)=>{
     if(has2(g)) resetPeek(g);
   });
 
-  const g=()=>rooms[currentRoom];
+  const g=()=>rooms[room];
   const isTurn=()=>g().order[g().turn]===socket.id;
 
   /* DRAW */
   socket.on("draw",()=>{
     const game=g();
-    if(!game||!has2(game)||!isTurn()) return;
+    if(!game||!has2(game)||game.phase!=="normal"||!isTurn()) return;
 
-    game.players[socket.id].pendingDraw=game.deck.pop();
-    io.to(currentRoom).emit("state",game);
+    game.players[socket.id].pending=game.deck.pop();
+    io.to(room).emit("state",game);
+  });
+
+  /* TAKE DISCARD */
+  socket.on("takeDiscard",()=>{
+    const game=g();
+    const p=game.players[socket.id];
+
+    if(!p.pending && game.discard.length){
+      p.pending=game.discard.pop();
+    }
+
+    io.to(room).emit("state",game);
+  });
+
+  /* REJECT (PUT BACK DISCARD) */
+  socket.on("reject",()=>{
+    const game=g();
+    const p=game.players[socket.id];
+
+    if(p.pending){
+      game.discard.push(p.pending);
+      p.pending=null;
+    }
+
+    io.to(room).emit("state",game);
   });
 
   /* SWAP */
@@ -136,57 +155,21 @@ io.on("connection",(socket)=>{
 
     const old=p.hand[i];
 
-    p.hand[i]=p.pendingDraw;
+    p.hand[i]=p.pending;
     game.discard.push(old);
+    p.pending=null;
 
-    /* 10 RULE TRIGGER */
+    /* 10 RULE */
     if(old.startsWith("10")){
-      game.specialSwap={
+      game.swapMode={
         player:socket.id,
-        step:"chooseOwn"
+        step:1,
+        card:old
       };
     }
 
-    p.pendingDraw=null;
-    nextTurn(game);
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  /* SPECIAL SWAP OWN CARD */
-  socket.on("specialOwn",(card)=>{
-    const game=g();
-    const p=game.players[socket.id];
-
-    if(!game.specialSwap||game.specialSwap.player!==socket.id) return;
-
-    game.specialSwap.step="chooseOpponent";
-    game.specialSwap.card=card;
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  /* SPECIAL SWAP OPPONENT CARD */
-  socket.on("specialOpp",(card)=>{
-    const game=g();
-
-    if(!game.specialSwap) return;
-
-    const opp=Object.values(game.players).find(x=>x.id!==socket.id);
-    const p=game.players[socket.id];
-
-    const i=opp.hand.indexOf(card);
-    if(i===-1) return;
-
-    const temp=opp.hand[i];
-    opp.hand[i]=game.specialSwap.card;
-
-    p.hand=p.hand.filter(c=>c!==game.specialSwap.card);
-    p.hand.push(temp);
-
-    game.specialSwap=null;
-
-    io.to(currentRoom).emit("state",game);
+    next(game);
+    io.to(room).emit("state",game);
   });
 
   /* GHOULIES FIXED */
@@ -194,15 +177,14 @@ io.on("connection",(socket)=>{
     const game=g();
     if(!game||!has2(game)) return;
 
-    if(game.ghouliesCalled) return;
+    if(game.ghoulies) return;
 
-    game.ghouliesCalled=true;
-    game.finalRound=true;
+    game.ghoulies=true;
+    game.phase="final";
 
-    nextTurn(game);
-    game.finalPlayer=game.order[game.turn];
+    next(game); // give OTHER player final turn
 
-    io.to(currentRoom).emit("state",game);
+    io.to(room).emit("state",game);
   });
 
   /* SNAP */
@@ -216,10 +198,9 @@ io.on("connection",(socket)=>{
       game.discard.push(card);
     }
 
-    io.to(currentRoom).emit("state",game);
+    io.to(room).emit("state",game);
   });
 
 });
 
-const PORT=process.env.PORT||3000;
-server.listen(PORT,()=>console.log("Server running on",PORT));
+server.listen(process.env.PORT||3000,()=>console.log("Server running"));
