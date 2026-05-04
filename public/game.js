@@ -13,8 +13,7 @@ socket.on("you", (id) => {
 socket.on("state", (g) => {
   state = g;
 
-  // 🔥 HARD FIX: prevent stuck overlay on first load
-  if (!initialised) {
+  if (!initialised){
     document.getElementById("endScreen").classList.add("hidden");
     initialised = true;
   }
@@ -34,8 +33,8 @@ function opp(){
 function file(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
-  const suit = { "♠":"s","♥":"h","♦":"d","♣":"c" }[s];
-  return `/cards/${suit}${v.padStart(2,"0")}.png`;
+  const map = { "♠":"s","♥":"h","♦":"d","♣":"c" };
+  return `/cards/${map[s]}${v.padStart(2,"0")}.png`;
 }
 
 function back(){
@@ -54,7 +53,6 @@ function render(){
   document.getElementById("status").innerText =
     isTurn ? "Your turn" : "Their turn";
 
-  /* END SCREEN FIX */
   const end = document.getElementById("endScreen");
   const txt = document.getElementById("endText");
 
@@ -65,20 +63,16 @@ function render(){
     end.classList.add("hidden");
   }
 
-  /* HAND */
   document.getElementById("hand").innerHTML =
     p.hand.map(c => `<img class="card" data-card="${c}" src="${back()}">`).join("");
 
-  /* OPP */
   document.getElementById("opponentHand").innerHTML =
     o ? o.hand.map(c => `<img class="card" src="${back()}">`).join("") : "";
 
-  /* DISCARD */
   const top = state.discard.at(-1);
   document.getElementById("discard").innerHTML =
     top ? `<img class="card" src="${file(top)}">` : "";
 
-  /* SCORES */
   document.getElementById("scores").innerHTML =
     Object.keys(state.players || {}).map(id =>
       `<div>${id === myId ? "You" : "Opponent"}: ${state.scores[id] || 0}</div>`
@@ -89,22 +83,17 @@ function render(){
 document.addEventListener("click", (e) => {
 
   if (!state) return;
-
   if (state.gameOver) return;
 
   if (e.target.id === "deck") socket.emit("draw");
 
-  if (e.target.closest("#discard")){
-    socket.emit("takeDiscard");
-  }
+  if (e.target.closest("#discard")) socket.emit("takeDiscard");
 
-  if (e.target.dataset.card && me()?.pending){
+  if (e.target.dataset.card && me()?.pending)
     socket.emit("swap", e.target.dataset.card);
-  }
 
-  if (e.target.id === "ghouliesBtn"){
+  if (e.target.id === "ghouliesBtn")
     socket.emit("callGhoulies");
-  }
 
   if (e.target.id === "restartBtn"){
     document.getElementById("endScreen").classList.add("hidden");

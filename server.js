@@ -23,21 +23,11 @@ function createDeck(){
   return shuffle(d);
 }
 
-function value(card){
-  const v = card.slice(0,-1);
-  const s = card.slice(-1);
-
-  if (v === "A") return 1;
-  if (v === "J" || v === "Q" || v === "K"){
-    if (v === "K" && (s === "♥" || s === "♦")) return 0;
-    return 10;
-  }
-  return parseInt(v);
+function deepClone(obj){
+  return JSON.parse(JSON.stringify(obj));
 }
 
-const rooms = {};
-
-function newGameState(){
+function newGame(){
   const deck = createDeck();
 
   return {
@@ -51,70 +41,38 @@ function newGameState(){
     gameOver: false,
     loser: null,
 
-    roundEnding: false,
-    finalTurns: 0,
     specialMode: null,
-    peekActive: false
+    roundEnding: false,
+    finalTurns: 0
   };
 }
 
-function deepClone(obj){
-  return JSON.parse(JSON.stringify(obj));
+const rooms = {};
+
+/* 🔥 SAFE ROOM GETTER (FIXES 502 CRASHES) */
+function getRoom(socket){
+  const roomId = [...socket.rooms].find(r => r !== socket.id);
+  if (!roomId) return null;
+  return rooms[roomId];
 }
 
-function startPeek(room, g){
-  g.peekActive = true;
-
-  Object.values(g.players).forEach(p => {
-    p.peek = [p.hand[0], p.hand[1]];
-    p.revealed = true;
-  });
-
-  io.to(room).emit("state", deepClone(g));
-
-  setTimeout(() => {
-    g.peekActive = false;
-
-    Object.values(g.players).forEach(p => {
-      p.peek = [];
-      p.revealed = false;
-    });
-
-    io.to(room).emit("state", deepClone(g));
-  }, 3000);
+function getRoomId(socket){
+  return [...socket.rooms].find(r => r !== socket.id);
 }
 
-/* 🔥 HARD RESET ROOM */
-function resetRoom(roomId){
-  const old = rooms[roomId];
-  if (!old) return;
+function endGame(roomId, g){
+  let loser = null;
+  let max = -1;
 
-  const deck = createDeck();
-
-  rooms[roomId] = {
-    deck,
-    discard: [deck.pop()],
-    players: old.players,
-    order: old.order,
-    turn: 0,
-
-    scores: {},
-    gameOver: false,
-    loser: null,
-
-    roundEnding: false,
-    finalTurns: 0,
-    specialMode: null,
-    peekActive: false
-  };
-
-  const g = rooms[roomId];
-
-  for (const id in g.players){
-    g.players[id].hand = g.deck.splice(0,4);
-    g.players[id].pending = null;
-    g.scores[id] = 0;
+  for (let id in g.scores){
+    if (g.scores[id] > max){
+      max = g.scores[id];
+      loser = id;
+    }
   }
+
+  g.gameOver = true;
+  g.loser = loser;
 
   io.to(roomId).emit("state", deepClone(g));
 }
@@ -123,8 +81,8 @@ io.on("connection", (socket) => {
 
   socket.on("join", (roomId) => {
 
-    if (!rooms[roomId]) {
-      rooms[roomId] = newGameState();
+    if (!rooms[roomId]){
+      rooms[roomId] = newGame();
     }
 
     const g = rooms[roomId];
@@ -133,9 +91,7 @@ io.on("connection", (socket) => {
     if (!g.players[socket.id] && Object.keys(g.players).length < 2){
       g.players[socket.id] = {
         hand: g.deck.splice(0,4),
-        pending: null,
-        peek: [],
-        revealed: false
+        pending: null
       };
 
       g.order.push(socket.id);
@@ -143,32 +99,28 @@ io.on("connection", (socket) => {
     }
 
     socket.emit("you", socket.id);
-
-    // 🔥 ALWAYS SEND CLEAN SNAPSHOT
     socket.emit("state", deepClone(g));
 
     if (Object.keys(g.players).length === 2){
-      startPeek(roomId, g);
+      io.to(roomId).emit("state", deepClone(g));
     }
   });
 
-  const getRoom = () => rooms[socket.rooms.values().next().value];
-
-  function isTurn(g){
-    return g.order[g.turn] === socket.id;
-  }
+  const isTurn = (g) => g.order[g.turn] === socket.id;
 
   socket.on("draw", () => {
-    const g = getRoom();
+    const g = getRoom(socket);
     if (!g || g.gameOver) return;
     if (!isTurn(g)) return;
 
-    g.players[socket.id].pending = g.deck.pop();
-    io.to([...socket.rooms][1]).emit("state", deepClone(g));
+    const p = g.players[socket.id];
+    p.pending = g.deck.pop();
+
+    io.to(getRoomId(socket)).emit("state", deepClone(g));
   });
 
   socket.on("takeDiscard", () => {
-    const g = getRoom();
+    const g = getRoom(socket);
     if (!g) return;
 
     const p = g.players[socket.id];
@@ -176,23 +128,24 @@ io.on("connection", (socket) => {
       p.pending = g.discard.pop();
     }
 
-    io.to([...socket.rooms][1]).emit("state", deepClone(g));
+    io.to(getRoomId(socket)).emit("state", deepClone(g));
   });
 
   socket.on("reject", () => {
-    const g = getRoom();
-    const p = g.players[socket.id];
+    const g = getRoom(socket);
+    if (!g) return;
 
+    const p = g.players[socket.id];
     if (p.pending){
       g.discard.push(p.pending);
       p.pending = null;
     }
 
-    io.to([...socket.rooms][1]).emit("state", deepClone(g));
+    io.to(getRoomId(socket)).emit("state", deepClone(g));
   });
 
   socket.on("swap", (card) => {
-    const g = getRoom();
+    const g = getRoom(socket);
     if (!g) return;
 
     const p = g.players[socket.id];
@@ -206,37 +159,67 @@ io.on("connection", (socket) => {
 
     g.turn = (g.turn + 1) % g.order.length;
 
-    io.to([...socket.rooms][1]).emit("state", deepClone(g));
+    io.to(getRoomId(socket)).emit("state", deepClone(g));
   });
 
   socket.on("snap", (card) => {
-    const g = getRoom();
+    const g = getRoom(socket);
     if (!g || g.gameOver) return;
 
     const p = g.players[socket.id];
     const top = g.discard.at(-1);
 
-    if (card && top && card.slice(0,-1) === top.slice(0,-1)){
+    if (top && card.slice(0,-1) === top.slice(0,-1)){
       p.hand = p.hand.filter(c => c !== card);
       g.discard.push(card);
     }
 
-    io.to([...socket.rooms][1]).emit("state", deepClone(g));
+    io.to(getRoomId(socket)).emit("state", deepClone(g));
   });
 
   socket.on("callGhoulies", () => {
-    const g = getRoom();
+    const g = getRoom(socket);
     if (!g || g.roundEnding) return;
 
     g.roundEnding = true;
     g.finalTurns = 1;
+
     g.turn = (g.turn + 1) % g.order.length;
 
-    io.to([...socket.rooms][1]).emit("state", deepClone(g));
+    io.to(getRoomId(socket)).emit("state", deepClone(g));
   });
 
   socket.on("restartGame", (roomId) => {
-    resetRoom(roomId);
+    const old = rooms[roomId];
+    if (!old) return;
+
+    const deck = createDeck();
+
+    rooms[roomId] = {
+      deck,
+      discard: [deck.pop()],
+      players: old.players,
+      order: old.order,
+      turn: 0,
+
+      scores: {},
+      gameOver: false,
+      loser: null,
+
+      specialMode: null,
+      roundEnding: false,
+      finalTurns: 0
+    };
+
+    const g = rooms[roomId];
+
+    for (let id in g.players){
+      g.players[id].hand = g.deck.splice(0,4);
+      g.players[id].pending = null;
+      g.scores[id] = 0;
+    }
+
+    io.to(roomId).emit("state", deepClone(g));
   });
 
 });
