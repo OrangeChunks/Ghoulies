@@ -98,6 +98,7 @@ function endRound(game,room){
     }
   }
 
+  /* IF GAME OVER → STOP */
   if(game.gameOver){
     io.to(room).emit("state",game);
     return;
@@ -148,4 +149,167 @@ io.on("connection",(socket)=>{
     }
 
     socket.join(id);
-    socket
+    socket.emit("you",socket.id);
+    io.to(id).emit("state",g);
+
+    if(has2(g)) startPeek(id,g);
+  });
+
+  const g=()=>rooms[currentRoom];
+  const isTurn=()=>g().order[g().turn]===socket.id;
+
+  /* BLOCK INPUT IF GAME OVER */
+  function blocked(game){
+    return game.gameOver || !has2(game);
+  }
+
+  /* DRAW */
+  socket.on("draw",()=>{
+    const game=g();
+    if(blocked(game)||!isTurn()||game.specialMode) return;
+
+    game.players[socket.id].pending=game.deck.pop();
+    io.to(currentRoom).emit("state",game);
+  });
+
+  /* DISCARD */
+  socket.on("takeDiscard",()=>{
+    const game=g();
+    if(blocked(game)||game.specialMode) return;
+
+    const p=game.players[socket.id];
+
+    if(!p.pending && game.discard.length){
+      p.pending=game.discard.pop();
+    }
+
+    io.to(currentRoom).emit("state",game);
+  });
+
+  socket.on("reject",()=>{
+    const game=g();
+    const p=game.players[socket.id];
+
+    if(p.pending){
+      game.discard.push(p.pending);
+      p.pending=null;
+    }
+
+    io.to(currentRoom).emit("state",game);
+  });
+
+  /* SWAP */
+  socket.on("swap",(card)=>{
+    const game=g();
+    if(blocked(game)||!isTurn()||game.specialMode) return;
+
+    const p=game.players[socket.id];
+
+    const i=p.hand.indexOf(card);
+    if(i===-1) return;
+
+    const old=p.hand[i];
+
+    p.hand[i]=p.pending;
+    game.discard.push(old);
+    p.pending=null;
+
+    /* 10 RULE */
+    if(old.startsWith("10")){
+      game.specialMode={
+        player:socket.id,
+        step:1,
+        selectedOwn:null
+      };
+      io.to(currentRoom).emit("state",game);
+      return;
+    }
+
+    if(game.roundEnding){
+      game.finalTurns--;
+      if(game.finalTurns<=0){
+        endRound(game,currentRoom);
+        return;
+      }
+    } else {
+      nextTurn(game);
+    }
+
+    io.to(currentRoom).emit("state",game);
+  });
+
+  /* 10 STEP 1 */
+  socket.on("tenOwn",(card)=>{
+    const game=g();
+    if(!game.specialMode || game.specialMode.player!==socket.id) return;
+
+    game.specialMode.selectedOwn=card;
+    game.specialMode.step=2;
+
+    io.to(currentRoom).emit("state",game);
+  });
+
+  /* 10 STEP 2 */
+  socket.on("tenOpp",(card)=>{
+    const game=g();
+    if(!game.specialMode) return;
+
+    const p=game.players[game.specialMode.player];
+    const opp=Object.values(game.players).find(x=>x!==p);
+
+    const i=opp.hand.indexOf(card);
+    if(i===-1) return;
+
+    const temp=opp.hand[i];
+    opp.hand[i]=game.specialMode.selectedOwn;
+
+    const ownIndex=p.hand.indexOf(game.specialMode.selectedOwn);
+    p.hand[ownIndex]=temp;
+
+    game.specialMode=null;
+
+    if(game.roundEnding){
+      game.finalTurns--;
+      if(game.finalTurns<=0){
+        endRound(game,currentRoom);
+        return;
+      }
+    } else {
+      nextTurn(game);
+    }
+
+    io.to(currentRoom).emit("state",game);
+  });
+
+  /* GHOULIES */
+  socket.on("callGhoulies",()=>{
+    const game=g();
+    if(blocked(game)||game.roundEnding) return;
+
+    game.roundEnding=true;
+    game.finalTurns=1;
+
+    nextTurn(game);
+
+    io.to(currentRoom).emit("state",game);
+  });
+
+  /* SNAP */
+  socket.on("snap",(card)=>{
+    const game=g();
+    if(game.gameOver) return;
+
+    const p=game.players[socket.id];
+    const top=game.discard.at(-1);
+
+    if(card && top && card.slice(0,-1)===top.slice(0,-1)){
+      p.hand=p.hand.filter(c=>c!==card);
+      game.discard.push(card);
+    }
+
+    io.to(currentRoom).emit("state",game);
+  });
+
+});
+
+server.listen(process.env.PORT||3000,()=>console.log("Server running"));
