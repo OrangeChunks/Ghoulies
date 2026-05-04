@@ -1,80 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Ghoulies 🎴</title>
+<title>Ghoulies</title>
 
-  <style>
-    body {
-      background: #0b3d2e;
-      color: white;
-      text-align: center;
-      font-family: Arial;
-    }
+<style>
+body {
+  background:#0b3d2e;
+  color:white;
+  font-family:Arial;
+}
 
-    #board {
-      display: flex;
-      justify-content: center;
-      gap: 40px;
-      margin: 20px;
-    }
+#container{
+  display:flex;
+}
 
-    .card {
-      width: 80px;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
+#game{
+  flex:3;
+  text-align:center;
+}
 
-    .card:hover {
-      transform: scale(1.1);
-    }
+#scores{
+  flex:1;
+  padding:20px;
+  border-left:2px solid white;
+}
 
-    #hand img:hover {
-      transform: scale(1.2);
-      outline: 2px solid red;
-    }
+.card{
+  width:80px;
+  cursor:pointer;
+}
 
-    #hand, #opponent {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin: 20px;
-    }
-
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin: 10px;
-      cursor: pointer;
-    }
-
-    #scores {
-      margin-top: 20px;
-      font-size: 18px;
-    }
-  </style>
+#hand,#opponent{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+}
+</style>
 </head>
 
 <body>
 
-<h1>Ghoulies 🎴</h1>
+<div id="container">
+
+<div id="game">
+
+<h1>Ghoulies</h1>
 
 <div id="board">
-  <img id="deck" src="/cards/back.png" class="card">
-  <div id="discard"></div>
+<img id="deck" src="/cards/back.png" class="card">
+<div id="discard"></div>
 </div>
 
-<h2 id="status">Connecting...</h2>
+<h2 id="status"></h2>
+
 <div id="drawn"></div>
 
-<button id="ghouliesBtn">Call Ghoulies 👻</button>
-
-<div id="scores"></div>
+<button id="ghouliesBtn">Call Ghoulies</button>
 
 <h3>Opponent</h3>
 <div id="opponent"></div>
 
 <h3>Your Hand</h3>
 <div id="hand"></div>
+
+</div>
+
+<div id="scores"></div>
+
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="game.js"></script>
