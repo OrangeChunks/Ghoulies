@@ -8,6 +8,9 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
+/* =========================
+   CARD DATA
+========================= */
 const SUITS = ["♠","♥","♦","♣"];
 const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
@@ -25,16 +28,20 @@ function createDeck(){
   return shuffle(d);
 }
 
-/* SCORE */
+/* =========================
+   SCORING
+========================= */
 function cardValue(card){
-  const v=card.slice(0,-1);
-  const s=card.slice(-1);
+  const v = card.slice(0,-1);
+  const s = card.slice(-1);
 
-  if(v==="A") return 1;
-  if(v==="J"||v==="Q"||v==="K"){
-    if(v==="K"&&(s==="♥"||s==="♦")) return 0;
+  if(v === "A") return 1;
+
+  if(v === "J" || v === "Q" || v === "K"){
+    if(v === "K" && (s === "♥" || s === "♦")) return 0;
     return 10;
   }
+
   return parseInt(v);
 }
 
@@ -42,11 +49,13 @@ function handScore(hand){
   return hand.reduce((a,c)=>a+cardValue(c),0);
 }
 
-/* GAME STATE */
-const rooms={};
+/* =========================
+   GAME STATE
+========================= */
+const rooms = {};
 
 function createGame(){
-  const deck=createDeck();
+  const deck = createDeck();
   return {
     deck,
     discard:[deck.pop()],
@@ -63,148 +72,170 @@ function createGame(){
 }
 
 function hasTwoPlayers(g){
-  return Object.keys(g.players).length===2;
+  return Object.keys(g.players).length === 2;
 }
 
 function nextTurn(g){
-  g.turn=(g.turn+1)%g.order.length;
+  g.turn = (g.turn + 1) % g.order.length;
 }
 
 function resetRound(g){
-  const deck=createDeck();
+  const deck = createDeck();
 
-  g.deck=deck;
-  g.discard=[deck.pop()];
-  g.finalRound=false;
-  g.finalPlayer=null;
-  g.showingScores=false;
-  g.ghouliesCalled=false;
+  g.deck = deck;
+  g.discard = [deck.pop()];
+  g.finalRound = false;
+  g.finalPlayer = null;
+  g.showingScores = false;
+  g.ghouliesCalled = false;
 
   Object.values(g.players).forEach(p=>{
-    p.hand=deck.splice(0,4);
-    p.pendingDraw=null;
+    p.hand = deck.splice(0,4);
+    p.pendingDraw = null;
   });
 }
 
-/* SOCKET */
+/* =========================
+   SOCKET IO
+========================= */
 io.on("connection",(socket)=>{
 
-  let roomId;
+  let roomId = null;
 
   socket.on("join",(id)=>{
-    roomId=id;
+    roomId = id;
 
-    if(!rooms[id]) rooms[id]=createGame();
-    const g=rooms[id];
+    if(!rooms[id]) rooms[id] = createGame();
+    const g = rooms[id];
 
-    if(Object.keys(g.players).length<2){
-      g.players[socket.id]={
-        id:socket.id,
-        hand:g.deck.splice(0,4),
-        pendingDraw:null
+    if(Object.keys(g.players).length < 2){
+      g.players[socket.id] = {
+        id: socket.id,
+        hand: g.deck.splice(0,4),
+        pendingDraw: null
       };
       g.order.push(socket.id);
-      g.scores[socket.id]=0;
+      g.scores[socket.id] = 0;
     }
 
     socket.join(id);
-    socket.emit("you",socket.id);
-    io.to(id).emit("state",g);
+    socket.emit("you", socket.id);
+    io.to(id).emit("state", g);
   });
 
-  const gRoom=()=>rooms[roomId];
-  const isTurn=()=>gRoom().order[gRoom().turn]===socket.id;
+  const game = () => rooms[roomId];
+  const isTurn = () => game()?.order[game().turn] === socket.id;
 
+  /* DRAW */
   socket.on("draw",()=>{
-    const g=gRoom();
-    if(!g||!hasTwoPlayers(g)||!isTurn()||g.showingScores) return;
-    g.players[socket.id].pendingDraw=g.deck.pop();
-    io.to(roomId).emit("state",g);
+    const g = game();
+    if(!g || !hasTwoPlayers(g) || !isTurn() || g.showingScores) return;
+
+    g.players[socket.id].pendingDraw = g.deck.pop();
+    io.to(roomId).emit("state", g);
   });
 
+  /* TAKE DISCARD */
   socket.on("takeDiscard",(card)=>{
-    const g=gRoom();
-    if(!hasTwoPlayers(g)||!isTurn()||g.showingScores) return;
+    const g = game();
+    if(!hasTwoPlayers(g) || !isTurn() || g.showingScores) return;
 
-    const top=g.discard.at(-1);
-    if(card!==top) return;
+    const top = g.discard.at(-1);
+    if(card !== top) return;
 
     g.discard.pop();
-    g.players[socket.id].pendingDraw=top;
-    io.to(roomId).emit("state",g);
+    g.players[socket.id].pendingDraw = top;
+
+    io.to(roomId).emit("state", g);
   });
 
+  /* REJECT */
   socket.on("rejectDraw",()=>{
-    const g=gRoom();
-    if(!hasTwoPlayers(g)||!isTurn()||g.showingScores) return;
+    const g = game();
+    if(!hasTwoPlayers(g) || !isTurn() || g.showingScores) return;
 
-    const p=g.players[socket.id];
+    const p = g.players[socket.id];
     g.discard.push(p.pendingDraw);
-    p.pendingDraw=null;
+    p.pendingDraw = null;
 
     nextTurn(g);
-    io.to(roomId).emit("state",g);
+    io.to(roomId).emit("state", g);
   });
 
+  /* SWAP */
   socket.on("swap",(card)=>{
-    const g=gRoom();
-    if(!hasTwoPlayers(g)||!isTurn()||g.showingScores) return;
+    const g = game();
+    if(!hasTwoPlayers(g) || !isTurn() || g.showingScores) return;
 
-    const p=g.players[socket.id];
-    const i=p.hand.indexOf(card);
-    if(i===-1) return;
+    const p = g.players[socket.id];
+    const i = p.hand.indexOf(card);
+    if(i === -1) return;
 
-    const old=p.hand[i];
+    const old = p.hand[i];
 
-    p.hand[i]=p.pendingDraw;
+    p.hand[i] = p.pendingDraw;
     g.discard.push(old);
-    p.pendingDraw=null;
+    p.pendingDraw = null;
 
     nextTurn(g);
-    io.to(roomId).emit("state",g);
+    io.to(roomId).emit("state", g);
   });
 
+  /* END ROUND */
   function endRound(g){
-    g.showingScores=true;
+    g.showingScores = true;
 
     Object.values(g.players).forEach(p=>{
-      g.scores[p.id]+=handScore(p.hand);
+      g.scores[p.id] += handScore(p.hand);
     });
 
-    io.to(roomId).emit("state",g);
+    io.to(roomId).emit("state", g);
 
     setTimeout(()=>{
       resetRound(g);
-      io.to(roomId).emit("state",g);
+      io.to(roomId).emit("state", g);
     },3000);
   }
 
-  socket.on("callGhoulies",()=>{
-    const g=gRoom();
-    if(!g||!hasTwoPlayers(g)||g.ghouliesCalled) return;
-
-    g.ghouliesCalled=true;
-    g.finalRound=true;
-
-    nextTurn(g);
-    g.finalPlayer=g.order[g.turn];
-
-    io.to(roomId).emit("state",g);
-  });
-
+  /* SNAP */
   socket.on("snap",(card)=>{
-    const g=gRoom();
-    const p=g.players[socket.id];
-    const top=g.discard.at(-1);
+    const g = game();
+    if(!g) return;
 
-    if(card&&top&&card.slice(0,-1)===top.slice(0,-1)){
-      p.hand=p.hand.filter(c=>c!==card);
+    const p = g.players[socket.id];
+    const top = g.discard.at(-1);
+
+    if(card && top && card.slice(0,-1) === top.slice(0,-1)){
+      p.hand = p.hand.filter(c => c !== card);
       g.discard.push(card);
     }
 
-    io.to(roomId).emit("state",g);
+    io.to(roomId).emit("state", g);
+  });
+
+  /* GHOULIES (LOCKED) */
+  socket.on("callGhoulies",()=>{
+    const g = game();
+    if(!g || !hasTwoPlayers(g)) return;
+
+    if(g.ghouliesCalled) return; // 🔒 STOP SPAM
+
+    g.ghouliesCalled = true;
+    g.finalRound = true;
+
+    nextTurn(g);
+    g.finalPlayer = g.order[g.turn];
+
+    io.to(roomId).emit("state", g);
   });
 
 });
 
-server.listen(3000,()=>console.log("Server running"));
+/* =========================
+   🚨 FIX FOR RAILWAY 502
+========================= */
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
