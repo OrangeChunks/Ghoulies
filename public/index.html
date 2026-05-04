@@ -12,31 +12,51 @@ body{
   margin:0;
 }
 
-#container{
+#table{
   display:flex;
   flex-direction:column;
+  height:100vh;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px;
 }
 
-@media(min-width:700px){
-  #container{flex-direction:row;}
+/* CENTER AREA */
+#center{
+  display:flex;
+  gap:20px;
+  align-items:center;
+  justify-content:center;
 }
 
-#game{flex:3;text-align:center;}
-
-#scores{
-  flex:1;
-  border-left:2px solid white;
-  padding:15px;
+/* PLAYERS */
+#opponentArea,#playerArea{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
 }
 
+/* HANDS */
+.hand{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+
+/* CARDS */
 .card{
-  width:70px;
+  width:60px;
   cursor:pointer;
   transition:0.2s;
 }
 
-.card:hover{transform:scale(1.1);}
+.card:hover{
+  transform:scale(1.1);
+}
 
+/* BUTTON */
 button{
   padding:12px;
   font-size:16px;
@@ -47,20 +67,35 @@ button:disabled{
   opacity:0.4;
   cursor:not-allowed;
 }
+
+#scores{
+  position:absolute;
+  right:10px;
+  top:10px;
+  background:rgba(0,0,0,0.3);
+  padding:10px;
+  border-radius:10px;
+}
 </style>
 </head>
 
 <body>
 
-<div id="container">
+<div id="table">
 
-<div id="game">
+<!-- OPPONENT -->
+<div id="opponentArea">
+  <h3>Opponent</h3>
+  <div id="opponentHand" class="hand"></div>
+</div>
 
-<h1>Ghoulies</h1>
+<!-- CENTER -->
+<div id="center">
 
-<div>
-<img id="deck" src="/cards/back.png" class="card">
-<div id="discard"></div>
+  <img id="deck" src="/cards/back.png" class="card">
+
+  <div id="discard"></div>
+
 </div>
 
 <h2 id="status"></h2>
@@ -69,12 +104,10 @@ button:disabled{
 
 <button id="ghouliesBtn">Call Ghoulies 👻</button>
 
-<h3>Opponent</h3>
-<div id="opponent"></div>
-
-<h3>Your Hand</h3>
-<div id="hand"></div>
-
+<!-- PLAYER -->
+<div id="playerArea">
+  <h3>You</h3>
+  <div id="hand" class="hand"></div>
 </div>
 
 <div id="scores"></div>
