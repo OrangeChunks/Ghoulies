@@ -8,306 +8,237 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
-const SUITS = ["♠","♥","♦","♣"];
+const SUITS = ["♠", "♥", "♦", "♣"];
 const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
-function shuffle(a){ return a.sort(()=>Math.random()-0.5); }
+function shuffle(a){ return a.sort(() => Math.random() - 0.5); }
 
 function createDeck(){
-  let d=[];
-  for(let s of SUITS){
-    for(let v of VALUES){
-      d.push(v+s);
+  let d = [];
+  for (let s of SUITS){
+    for (let v of VALUES){
+      d.push(v + s);
     }
   }
   return shuffle(d);
 }
 
 function value(card){
-  const v=card.slice(0,-1);
-  const s=card.slice(-1);
+  const v = card.slice(0,-1);
+  const s = card.slice(-1);
 
-  if(v==="A") return 1;
-  if(v==="J"||v==="Q"||v==="K"){
-    if(v==="K"&&(s==="♥"||s==="♦")) return 0;
+  if (v === "A") return 1;
+  if (v === "J" || v === "Q" || v === "K"){
+    if (v === "K" && (s === "♥" || s === "♦")) return 0;
     return 10;
   }
   return parseInt(v);
 }
 
-const rooms={};
+const rooms = {};
 
-function createGame(){
-  const deck=createDeck();
+function newGameState(){
+  const deck = createDeck();
 
   return {
     deck,
-    discard:[deck.pop()],
-    players:{},
-    order:[],
-    turn:0,
+    discard: [deck.pop()],
+    players: {},
+    order: [],
+    turn: 0,
 
-    scores:{},
-    gameOver:false,
-    loser:null,
+    scores: {},
+    gameOver: false,
+    loser: null,
 
-    roundEnding:false,
-    finalTurns:0,
-
-    specialMode:null,
-    peekActive:false
+    roundEnding: false,
+    finalTurns: 0,
+    specialMode: null,
+    peekActive: false
   };
 }
 
-function has2(g){ return Object.keys(g.players).length===2; }
-function nextTurn(g){ g.turn=(g.turn+1)%g.order.length; }
+function deepClone(obj){
+  return JSON.parse(JSON.stringify(obj));
+}
 
-function startPeek(room,g){
-  g.peekActive=true;
+function startPeek(room, g){
+  g.peekActive = true;
 
-  Object.values(g.players).forEach(p=>{
-    p.peek=[p.hand[0],p.hand[1]];
-    p.revealed=true;
+  Object.values(g.players).forEach(p => {
+    p.peek = [p.hand[0], p.hand[1]];
+    p.revealed = true;
   });
 
-  io.to(room).emit("state",g);
+  io.to(room).emit("state", deepClone(g));
 
-  setTimeout(()=>{
-    g.peekActive=false;
-    Object.values(g.players).forEach(p=>{
-      p.peek=[];
-      p.revealed=false;
+  setTimeout(() => {
+    g.peekActive = false;
+
+    Object.values(g.players).forEach(p => {
+      p.peek = [];
+      p.revealed = false;
     });
-    io.to(room).emit("state",g);
-  },3000);
+
+    io.to(room).emit("state", deepClone(g));
+  }, 3000);
 }
 
-function endRound(game,room){
-
-  for(const id in game.players){
-    game.scores[id]=(game.scores[id]||0)+
-      game.players[id].hand.reduce((a,c)=>a+value(c),0);
-  }
-
-  for(const id in game.scores){
-    if(game.scores[id] >= 51){
-      game.gameOver=true;
-      game.loser=id;
-    }
-  }
-
-  if(game.gameOver){
-    io.to(room).emit("state",game);
-    return;
-  }
-
-  const deck=createDeck();
-
-  game.deck=deck;
-  game.discard=[deck.pop()];
-  game.roundEnding=false;
-  game.finalTurns=0;
-  game.specialMode=null;
-
-  for(const id in game.players){
-    game.players[id].hand=deck.splice(0,4);
-    game.players[id].pending=null;
-  }
-
-  game.turn=0;
-
-  startPeek(room,game);
-  io.to(room).emit("state",game);
-}
-
-/* 🔥 RESET GAME (FIX) */
-function resetGame(room){
-  const old = rooms[room];
-  if(!old) return;
+/* 🔥 HARD RESET ROOM */
+function resetRoom(roomId){
+  const old = rooms[roomId];
+  if (!old) return;
 
   const deck = createDeck();
 
-  rooms[room] = {
+  rooms[roomId] = {
     deck,
-    discard:[deck.pop()],
-    players:old.players,
-    order:old.order,
-    turn:0,
+    discard: [deck.pop()],
+    players: old.players,
+    order: old.order,
+    turn: 0,
 
-    scores:{},
-    gameOver:false,
-    loser:null,
+    scores: {},
+    gameOver: false,
+    loser: null,
 
-    roundEnding:false,
-    finalTurns:0,
-    specialMode:null,
-    peekActive:false
+    roundEnding: false,
+    finalTurns: 0,
+    specialMode: null,
+    peekActive: false
   };
 
-  const g = rooms[room];
+  const g = rooms[roomId];
 
-  for(const id in g.players){
+  for (const id in g.players){
     g.players[id].hand = g.deck.splice(0,4);
     g.players[id].pending = null;
     g.scores[id] = 0;
   }
 
-  io.to(room).emit("state",g);
+  io.to(roomId).emit("state", deepClone(g));
 }
 
-let currentRoom=null;
+io.on("connection", (socket) => {
 
-io.on("connection",(socket)=>{
+  socket.on("join", (roomId) => {
 
-  socket.on("join",(id)=>{
-    currentRoom=id;
+    if (!rooms[roomId]) {
+      rooms[roomId] = newGameState();
+    }
 
-    if(!rooms[id]) rooms[id]=createGame();
-    const g=rooms[id];
+    const g = rooms[roomId];
+    socket.join(roomId);
 
-    if(Object.keys(g.players).length<2){
-      g.players[socket.id]={
-        hand:g.deck.splice(0,4),
-        pending:null,
-        peek:[],
-        revealed:false
+    if (!g.players[socket.id] && Object.keys(g.players).length < 2){
+      g.players[socket.id] = {
+        hand: g.deck.splice(0,4),
+        pending: null,
+        peek: [],
+        revealed: false
       };
 
       g.order.push(socket.id);
-      g.scores[socket.id]=0;
+      g.scores[socket.id] = 0;
     }
 
-    socket.join(id);
-    socket.emit("you",socket.id);
-    io.to(id).emit("state",g);
+    socket.emit("you", socket.id);
 
-    if(has2(g)) startPeek(id,g);
+    // 🔥 ALWAYS SEND CLEAN SNAPSHOT
+    socket.emit("state", deepClone(g));
+
+    if (Object.keys(g.players).length === 2){
+      startPeek(roomId, g);
+    }
   });
 
-  const g=()=>rooms[currentRoom];
-  const isTurn=()=>g().order[g().turn]===socket.id;
+  const getRoom = () => rooms[socket.rooms.values().next().value];
 
-  function blocked(game){
-    return game.gameOver || !has2(game);
+  function isTurn(g){
+    return g.order[g.turn] === socket.id;
   }
 
-  socket.on("draw",()=>{
-    const game=g();
-    if(blocked(game)||!isTurn()||game.specialMode) return;
+  socket.on("draw", () => {
+    const g = getRoom();
+    if (!g || g.gameOver) return;
+    if (!isTurn(g)) return;
 
-    game.players[socket.id].pending=game.deck.pop();
-    io.to(currentRoom).emit("state",game);
+    g.players[socket.id].pending = g.deck.pop();
+    io.to([...socket.rooms][1]).emit("state", deepClone(g));
   });
 
-  socket.on("takeDiscard",()=>{
-    const game=g();
-    if(blocked(game)||game.specialMode) return;
+  socket.on("takeDiscard", () => {
+    const g = getRoom();
+    if (!g) return;
 
-    const p=game.players[socket.id];
-    if(!p.pending && game.discard.length){
-      p.pending=game.discard.pop();
+    const p = g.players[socket.id];
+    if (!p.pending && g.discard.length){
+      p.pending = g.discard.pop();
     }
 
-    io.to(currentRoom).emit("state",game);
+    io.to([...socket.rooms][1]).emit("state", deepClone(g));
   });
 
-  socket.on("reject",()=>{
-    const game=g();
-    const p=game.players[socket.id];
+  socket.on("reject", () => {
+    const g = getRoom();
+    const p = g.players[socket.id];
 
-    if(p.pending){
-      game.discard.push(p.pending);
-      p.pending=null;
+    if (p.pending){
+      g.discard.push(p.pending);
+      p.pending = null;
     }
 
-    io.to(currentRoom).emit("state",game);
+    io.to([...socket.rooms][1]).emit("state", deepClone(g));
   });
 
-  socket.on("swap",(card)=>{
-    const game=g();
-    if(blocked(game)||!isTurn()||game.specialMode) return;
+  socket.on("swap", (card) => {
+    const g = getRoom();
+    if (!g) return;
 
-    const p=game.players[socket.id];
-    const i=p.hand.indexOf(card);
-    if(i===-1) return;
+    const p = g.players[socket.id];
+    const i = p.hand.indexOf(card);
+    if (i === -1) return;
 
-    const old=p.hand[i];
-    p.hand[i]=p.pending;
-    game.discard.push(old);
-    p.pending=null;
+    const old = p.hand[i];
+    p.hand[i] = p.pending;
+    g.discard.push(old);
+    p.pending = null;
 
-    if(old.startsWith("10")){
-      game.specialMode={player:socket.id,step:1,selectedOwn:null};
-      io.to(currentRoom).emit("state",game);
-      return;
+    g.turn = (g.turn + 1) % g.order.length;
+
+    io.to([...socket.rooms][1]).emit("state", deepClone(g));
+  });
+
+  socket.on("snap", (card) => {
+    const g = getRoom();
+    if (!g || g.gameOver) return;
+
+    const p = g.players[socket.id];
+    const top = g.discard.at(-1);
+
+    if (card && top && card.slice(0,-1) === top.slice(0,-1)){
+      p.hand = p.hand.filter(c => c !== card);
+      g.discard.push(card);
     }
 
-    nextTurn(game);
-    io.to(currentRoom).emit("state",game);
+    io.to([...socket.rooms][1]).emit("state", deepClone(g));
   });
 
-  socket.on("tenOwn",(card)=>{
-    const game=g();
-    if(!game.specialMode || game.specialMode.player!==socket.id) return;
+  socket.on("callGhoulies", () => {
+    const g = getRoom();
+    if (!g || g.roundEnding) return;
 
-    game.specialMode.selectedOwn=card;
-    game.specialMode.step=2;
-    io.to(currentRoom).emit("state",game);
+    g.roundEnding = true;
+    g.finalTurns = 1;
+    g.turn = (g.turn + 1) % g.order.length;
+
+    io.to([...socket.rooms][1]).emit("state", deepClone(g));
   });
 
-  socket.on("tenOpp",(card)=>{
-    const game=g();
-    if(!game.specialMode) return;
-
-    const p=game.players[game.specialMode.player];
-    const opp=Object.values(game.players).find(x=>x!==p);
-
-    const i=opp.hand.indexOf(card);
-    if(i===-1) return;
-
-    const temp=opp.hand[i];
-    opp.hand[i]=game.specialMode.selectedOwn;
-
-    const ownIndex=p.hand.indexOf(game.specialMode.selectedOwn);
-    p.hand[ownIndex]=temp;
-
-    game.specialMode=null;
-    nextTurn(game);
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  socket.on("callGhoulies",()=>{
-    const game=g();
-    if(blocked(game)||game.roundEnding) return;
-
-    game.roundEnding=true;
-    game.finalTurns=1;
-    nextTurn(game);
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  socket.on("snap",(card)=>{
-    const game=g();
-    if(game.gameOver) return;
-
-    const p=game.players[socket.id];
-    const top=game.discard.at(-1);
-
-    if(card && top && card.slice(0,-1)===top.slice(0,-1)){
-      p.hand=p.hand.filter(c=>c!==card);
-      game.discard.push(card);
-    }
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  /* 🔥 PLAY AGAIN FIX */
-  socket.on("restartGame",(roomId)=>{
-    resetGame(roomId);
+  socket.on("restartGame", (roomId) => {
+    resetRoom(roomId);
   });
 
 });
 
-server.listen(process.env.PORT||3000,()=>console.log("Server running"));
+server.listen(3000, () => console.log("Server running"));
