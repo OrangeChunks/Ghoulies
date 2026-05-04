@@ -13,15 +13,12 @@ socket.on("state", (g) => {
   render();
 });
 
-function me(){
-  return state?.players?.[myId];
+function opponentId(){
+  if (!state?.order) return null;
+  return state.order.find(id => id !== myId);
 }
 
-function opp(){
-  return Object.entries(state.players || {}).find(([id]) => id !== myId)?.[1];
-}
-
-/* CARD */
+/* CARD IMAGE */
 function file(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
@@ -37,41 +34,39 @@ function back(){
 function render(){
   if (!state || !myId) return;
 
-  const p = me();
-  const o = opp();
+  const me = state.players?.[myId];
+  const opp = state.players?.[opponentId()];
 
   const isTurn = state.order[state.turn] === myId;
 
   document.getElementById("status").innerText =
     isTurn ? "Your turn" : "Their turn";
 
-  /* SCORES */
-  document.getElementById("scores").innerHTML =
-    Object.keys(state.scores || {}).map(id =>
-      `<div>${id === myId ? "You" : "Opponent"}: ${state.scores[id]}</div>`
-    ).join("");
+  /* SCORES (NO DUPLICATES) */
+  const scoresEl = document.getElementById("scores");
+  scoresEl.innerHTML = `
+    <div>You: ${state.scores?.[myId] || 0}</div>
+    <div>Opponent: ${state.scores?.[opponentId()] || 0}</div>
+  `;
 
-  /* PLAY AGAIN BUTTON (NO OVERLAY) */
+  /* PLAY AGAIN BUTTON */
   const btn = document.getElementById("restartBtn");
+  btn.style.display = state.gameOver ? "block" : "none";
 
-  if (state.gameOver === true){
-    btn.style.display = "block";
-  } else {
-    btn.style.display = "none";
-  }
-
-  /* HAND */
+  /* YOUR HAND */
   document.getElementById("hand").innerHTML =
-    p.hand.map(c =>
+    me?.hand?.map(c =>
       `<img class="card" data-card="${c}" src="${back()}">`
-    ).join("");
+    ).join("") || "";
 
-  /* OPP */
+  /* OPPONENT HAND */
   document.getElementById("opponentHand").innerHTML =
-    o ? o.hand.map(() => `<img class="card" src="${back()}">`).join("") : "";
+    opp?.hand?.map(() =>
+      `<img class="card" src="${back()}">`
+    ).join("") || "";
 
   /* DISCARD */
-  const top = state.discard.at(-1);
+  const top = state.discard?.at(-1);
   document.getElementById("discard").innerHTML =
     top ? `<img class="card" src="${file(top)}">` : "";
 }
@@ -85,10 +80,14 @@ document.addEventListener("click", (e) => {
 
   if (e.target.id === "deck") socket.emit("draw");
 
-  if (e.target.closest("#discard")) socket.emit("takeDiscard");
+  if (e.target.closest("#discard"))
+    socket.emit("takeDiscard");
 
-  if (e.target.dataset.card && me()?.pending)
+  if (e.target.dataset.card && state.players?.[myId]?.pending)
     socket.emit("swap", e.target.dataset.card);
+
+  if (e.target.id === "ghouliesBtn")
+    socket.emit("callGhoulies");
 
   if (e.target.id === "restartBtn")
     socket.emit("restartGame", "room1");
