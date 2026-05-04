@@ -8,9 +8,6 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
-/* =========================
-   DECK
-========================= */
 const SUITS = ["♠","♥","♦","♣"];
 const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
@@ -50,7 +47,7 @@ function handScore(hand){
 }
 
 /* =========================
-   STATE
+   GAME STATE
 ========================= */
 const rooms = {};
 
@@ -66,7 +63,8 @@ function createGame(){
     message:"Waiting for opponent...",
     finalRound:false,
     finalPlayer:null,
-    showingScores:false
+    showingScores:false,
+    ghouliesCalled:false // ✅ IMPORTANT FIX
   };
 }
 
@@ -86,6 +84,7 @@ function resetRound(game){
   game.finalRound = false;
   game.finalPlayer = null;
   game.showingScores = false;
+  game.ghouliesCalled = false; // reset lock
 
   Object.values(game.players).forEach(p=>{
     p.hand = deck.splice(0,4);
@@ -101,7 +100,6 @@ io.on("connection",(socket)=>{
   let roomId=null;
 
   socket.on("join",(id)=>{
-
     roomId=id;
 
     if(!rooms[id]) rooms[id]=createGame();
@@ -136,7 +134,7 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
-  /* TAKE DISCARD */
+  /* DISCARD TAKE */
   socket.on("takeDiscard",(card)=>{
     const game=rooms[roomId];
     if(!hasTwoPlayers(game)||!isMyTurn(game)||game.showingScores) return;
@@ -195,13 +193,13 @@ io.on("connection",(socket)=>{
 
   function endRound(game){
 
-    game.showingScores = true;
+    game.showingScores=true;
 
     Object.values(game.players).forEach(p=>{
-      game.scores[p.id] += handScore(p.hand);
+      game.scores[p.id]+=handScore(p.hand);
     });
 
-    game.message = "Round over!";
+    game.message="Round over!";
 
     io.to(roomId).emit("state",game);
 
@@ -219,7 +217,7 @@ io.on("connection",(socket)=>{
     const p=game.players[socket.id];
     const top=game.discard.at(-1);
 
-    if(card && top && card.slice(0,-1)===top.slice(0,-1)){
+    if(card&&top&&card.slice(0,-1)===top.slice(0,-1)){
       p.hand=p.hand.filter(c=>c!==card);
       game.discard.push(card);
     }
@@ -227,10 +225,15 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
-  /* GHOULIES */
+  /* GHOULIES (FIXED) */
   socket.on("callGhoulies",()=>{
     const game=rooms[roomId];
-    if(!game||!hasTwoPlayers(game)||game.showingScores) return;
+    if(!game||!hasTwoPlayers(game)) return;
+
+    // 🚫 HARD BLOCK MULTIPLE CALLS
+    if(game.ghouliesCalled) return;
+
+    game.ghouliesCalled=true;
 
     game.finalRound=true;
     nextTurn(game);

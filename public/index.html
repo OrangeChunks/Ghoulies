@@ -5,7 +5,7 @@
 <title>Ghoulies</title>
 
 <style>
-body {
+body{
   background:#0b3d2e;
   color:white;
   font-family:Arial;
@@ -18,20 +18,15 @@ body {
 }
 
 @media(min-width:700px){
-  #container{
-    flex-direction:row;
-  }
+  #container{flex-direction:row;}
 }
 
-#game{
-  flex:3;
-  text-align:center;
-}
+#game{flex:3;text-align:center;}
 
 #scores{
   flex:1;
-  padding:15px;
   border-left:2px solid white;
+  padding:15px;
 }
 
 .card{
@@ -40,25 +35,17 @@ body {
   transition:0.2s;
 }
 
-.card:hover{
-  transform:scale(1.1);
-}
-
-@media(min-width:700px){
-  .card{ width:90px; }
-}
-
-#hand,#opponent{
-  display:flex;
-  justify-content:center;
-  gap:8px;
-  flex-wrap:wrap;
-}
+.card:hover{transform:scale(1.1);}
 
 button{
   padding:12px;
   font-size:16px;
   margin:10px;
+}
+
+button:disabled{
+  opacity:0.4;
+  cursor:not-allowed;
 }
 </style>
 </head>
@@ -72,8 +59,8 @@ button{
 <h1>Ghoulies</h1>
 
 <div>
-  <img id="deck" src="/cards/back.png" class="card">
-  <div id="discard"></div>
+<img id="deck" src="/cards/back.png" class="card">
+<div id="discard"></div>
 </div>
 
 <h2 id="status"></h2>
