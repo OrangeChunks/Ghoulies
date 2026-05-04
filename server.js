@@ -47,6 +47,10 @@ function createGame(){
     order:[],
     turn:0,
 
+    scores:{},
+    gameOver:false,
+    loser:null,
+
     roundEnding:false,
     finalTurns:0,
 
@@ -80,11 +84,26 @@ function startPeek(room,g){
 
 function endRound(game,room){
 
+  /* ADD SCORES */
   for(const id in game.players){
     game.scores[id]=(game.scores[id]||0)+
       game.players[id].hand.reduce((a,c)=>a+value(c),0);
   }
 
+  /* CHECK LOSER */
+  for(const id in game.scores){
+    if(game.scores[id] >= 51){
+      game.gameOver = true;
+      game.loser = id;
+    }
+  }
+
+  if(game.gameOver){
+    io.to(room).emit("state",game);
+    return;
+  }
+
+  /* RESET ROUND */
   const deck=createDeck();
 
   game.deck=deck;
@@ -125,167 +144,8 @@ io.on("connection",(socket)=>{
       };
 
       g.order.push(socket.id);
-      g.scores=g.scores||{};
       g.scores[socket.id]=0;
     }
 
     socket.join(id);
-    socket.emit("you",socket.id);
-    io.to(id).emit("state",g);
-
-    if(has2(g)) startPeek(id,g);
-  });
-
-  const g=()=>rooms[currentRoom];
-  const isTurn=()=>g().order[g().turn]===socket.id;
-
-  /* DRAW */
-  socket.on("draw",()=>{
-    const game=g();
-    if(!has2(game)||!isTurn()||game.peekActive||game.specialMode) return;
-
-    game.players[socket.id].pending=game.deck.pop();
-    io.to(currentRoom).emit("state",game);
-  });
-
-  /* DISCARD */
-  socket.on("takeDiscard",()=>{
-    const game=g();
-    if(!has2(game)||game.specialMode) return;
-
-    const p=game.players[socket.id];
-
-    if(!p.pending && game.discard.length){
-      p.pending=game.discard.pop();
-    }
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  socket.on("reject",()=>{
-    const game=g();
-    const p=game.players[socket.id];
-
-    if(p.pending){
-      game.discard.push(p.pending);
-      p.pending=null;
-    }
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  /* SWAP */
-  socket.on("swap",(card)=>{
-    const game=g();
-    if(!has2(game)||!isTurn()||game.specialMode) return;
-
-    const p=game.players[socket.id];
-
-    const i=p.hand.indexOf(card);
-    if(i===-1) return;
-
-    const old=p.hand[i];
-
-    p.hand[i]=p.pending;
-    game.discard.push(old);
-    p.pending=null;
-
-    /* 10 RULE */
-    if(old.startsWith("10")){
-      game.specialMode={
-        player:socket.id,
-        step:1,
-        selectedOwn:null
-      };
-
-      io.to(currentRoom).emit("state",game);
-      return;
-    }
-
-    if(game.roundEnding){
-      game.finalTurns--;
-      if(game.finalTurns<=0){
-        endRound(game,currentRoom);
-        return;
-      }
-    } else {
-      nextTurn(game);
-    }
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  /* 10 STEP 1 */
-  socket.on("tenOwn",(card)=>{
-    const game=g();
-    if(!game.specialMode || game.specialMode.player!==socket.id) return;
-
-    game.specialMode.selectedOwn=card;
-    game.specialMode.step=2;
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  /* 🔥 FIXED 10 STEP 2 (TURN ADVANCES HERE) */
-  socket.on("tenOpp",(card)=>{
-    const game=g();
-    if(!game.specialMode) return;
-
-    const p=game.players[game.specialMode.player];
-    const opp=Object.values(game.players).find(x=>x!==p);
-
-    const i=opp.hand.indexOf(card);
-    if(i===-1) return;
-
-    const temp=opp.hand[i];
-    opp.hand[i]=game.specialMode.selectedOwn;
-
-    const ownIndex=p.hand.indexOf(game.specialMode.selectedOwn);
-    p.hand[ownIndex]=temp;
-
-    game.specialMode=null;
-
-    /* ✅ FIX: TURN HANDOFF HERE */
-    if(game.roundEnding){
-      game.finalTurns--;
-      if(game.finalTurns<=0){
-        endRound(game,currentRoom);
-        return;
-      }
-    } else {
-      nextTurn(game);  // ← THIS WAS THE MISSING PIECE
-    }
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  /* GHOULIES */
-  socket.on("callGhoulies",()=>{
-    const game=g();
-    if(game.roundEnding) return;
-
-    game.roundEnding=true;
-    game.finalTurns=1;
-
-    nextTurn(game);
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-  /* SNAP */
-  socket.on("snap",(card)=>{
-    const game=g();
-    const p=game.players[socket.id];
-    const top=game.discard.at(-1);
-
-    if(card&&top&&card.slice(0,-1)===top.slice(0,-1)){
-      p.hand=p.hand.filter(c=>c!==card);
-      game.discard.push(card);
-    }
-
-    io.to(currentRoom).emit("state",game);
-  });
-
-});
-
-server.listen(process.env.PORT||3000,()=>console.log("Server running"));
+    socket
