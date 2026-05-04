@@ -64,7 +64,6 @@ function createGame(){
     order:[],
     turn:0,
     scores:{},
-    ghouliesCalled:false,
     gameOver:false,
     message:""
   };
@@ -115,9 +114,7 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
-  /* =========================
-     DRAW
-  ========================= */
+  /* DRAW */
   socket.on("draw",()=>{
 
     const game = rooms[roomId];
@@ -127,15 +124,12 @@ io.on("connection",(socket)=>{
     if(!isMyTurn(game, socket)) return;
 
     p.pendingDraw = game.deck.pop();
-
     game.message = `Picked up ${p.pendingDraw}`;
 
     io.to(roomId).emit("state",game);
   });
 
-  /* =========================
-     DISCARD PICKUP
-  ========================= */
+  /* TAKE DISCARD */
   socket.on("takeDiscard",(card)=>{
 
     const game = rooms[roomId];
@@ -155,9 +149,7 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
-  /* =========================
-     REJECT DRAW
-  ========================= */
+  /* REJECT DRAW */
   socket.on("rejectDraw",()=>{
 
     const game = rooms[roomId];
@@ -171,15 +163,12 @@ io.on("connection",(socket)=>{
     p.pendingDraw = null;
 
     nextTurn(game);
-
     game.message = "Card discarded";
 
     io.to(roomId).emit("state",game);
   });
 
-  /* =========================
-     SWAP
-  ========================= */
+  /* SWAP */
   socket.on("swap",(card)=>{
 
     const game = rooms[roomId];
@@ -204,9 +193,7 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
-  /* =========================
-     SNAP (ANYTIME)
-  ========================= */
+  /* SNAP (ANYTIME) */
   socket.on("snap",(card)=>{
 
     const game = rooms[roomId];
@@ -231,19 +218,14 @@ io.on("connection",(socket)=>{
     io.to(roomId).emit("state",game);
   });
 
-  /* =========================
-     GHOULIES FIXED
-  ========================= */
+  /* ✅ GHOULIES FIXED */
   socket.on("callGhoulies",()=>{
 
     const game = rooms[roomId];
-
     if(!game || game.gameOver) return;
 
-    game.ghouliesCalled = true;
     game.gameOver = true;
 
-    // calculate scores
     Object.values(game.players).forEach(p=>{
       game.scores[p.id] = handScore(p.hand);
     });
