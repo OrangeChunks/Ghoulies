@@ -51,6 +51,7 @@ function roomId(socket){
   return [...socket.rooms].find(r => r !== socket.id);
 }
 
+/* 51 RULE */
 function checkWin(g){
   for (let id in g.scores){
     if (g.scores[id] >= 51){
@@ -136,6 +137,19 @@ io.on("connection", (socket) => {
     io.to(roomId(socket)).emit("state", g);
   });
 
+  /* 🔥 GHOULIES FIXED */
+  socket.on("callGhoulies", () => {
+    const g = getRoom(socket);
+    if (!g || g.gameOver) return;
+
+    const ids = g.order;
+
+    // give ONE extra turn to opponent only if called early
+    g.turn = (g.turn + 1) % ids.length;
+
+    io.to(roomId(socket)).emit("state", g);
+  });
+
   socket.on("restart", (room) => {
     const deck = createDeck();
 
@@ -156,5 +170,4 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => console.log("Running on", PORT));

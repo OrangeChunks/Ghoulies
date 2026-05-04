@@ -12,13 +12,27 @@ socket.on("state", g => {
 });
 
 function me(){ return state.players?.[myId]; }
-function oppId(){ return state.order?.find(id => id !== myId); }
 
+function oppId(){
+  return state.order?.find(id => id !== myId);
+}
+
+/* ✔ FIXED CARD MAPPING (THIS FIXES JACKS ETC) */
 function file(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
-  const map = { "♠":"s","♥":"h","♦":"d","♣":"c" };
-  return `/cards/${map[s]}${v.padStart(2,"0")}.png`;
+
+  const suitMap = {
+    "♠":"s","♥":"h","♦":"d","♣":"c"
+  };
+
+  const valueMap = {
+    "A":"01","2":"02","3":"03","4":"04","5":"05",
+    "6":"06","7":"07","8":"08","9":"09",
+    "10":"10","J":"11","Q":"12","K":"13"
+  };
+
+  return `/cards/${suitMap[s]}${valueMap[v]}.png`;
 }
 
 function back(){ return "/cards/back.png"; }
@@ -41,20 +55,21 @@ function render(){
     state.gameOver ? "block" : "none";
 
   document.getElementById("hand").innerHTML =
-    p?.hand?.map(c => `<img class="card" data-card="${c}" src="${back()}">`).join("") || "";
+    p?.hand?.map(c =>
+      `<img class="card" data-card="${c}" src="${back()}">`
+    ).join("") || "";
 
   document.getElementById("opponentHand").innerHTML =
-    o?.hand?.map(() => `<img class="card" src="${back()}">`).join("") || "";
+    o?.hand?.map(() =>
+      `<img class="card" src="${back()}">`
+    ).join("") || "";
 
   const top = state.discard?.at(-1);
   document.getElementById("discard").innerHTML =
     top ? `<img class="card" src="${file(top)}">` : "";
-
-  const pending = p?.pending;
-  document.getElementById("pending").innerHTML =
-    pending ? `Drawn: ${pending}` : "";
 }
 
+/* INPUT */
 document.addEventListener("click", e => {
   if (!state) return;
 
@@ -65,11 +80,11 @@ document.addEventListener("click", e => {
   if (e.target.dataset.card && me()?.pending)
     socket.emit("swap", e.target.dataset.card);
 
+  if (e.target.id === "ghouliesBtn")
+    socket.emit("callGhoulies");
+
   if (e.target.id === "restartBtn")
     socket.emit("restart", "room1");
-
-  if (e.target.id === "ghouliesBtn")
-    socket.emit("snap");
 });
 
 document.addEventListener("dblclick", e => {
