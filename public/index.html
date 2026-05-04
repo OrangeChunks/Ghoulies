@@ -1,132 +1,88 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
 <title>Ghoulies</title>
 
 <style>
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #0f0f0f;
-    color: white;
-    text-align: center;
-  }
+body{
+  margin:0;
+  background:#111;
+  color:white;
+  text-align:center;
+  font-family:Arial;
+}
 
-  #status {
-    font-size: 20px;
-    padding: 10px;
-    font-weight: bold;
-  }
+#status{padding:10px;font-size:20px}
 
-  #scores {
-    font-size: 16px;
-    margin-bottom: 10px;
-  }
+#scores{margin-bottom:10px}
 
-  #restartBtn {
-    display: none;
-    margin: 10px auto;
-    padding: 10px 16px;
-    font-size: 16px;
-    cursor: pointer;
-  }
+.row{
+  display:flex;
+  justify-content:center;
+  gap:18px;
+  flex-wrap:wrap;
+  margin:16px;
+}
 
-  .row {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin: 10px;
-  }
+.card{
+  width:70px;
+  margin:4px;
+  transition:0.2s;
+}
 
-  /* CARD STYLE */
-  .card {
-    width: 70px;
-    height: auto;
-    cursor: pointer;
-    transition: transform 0.15s ease;
-  }
+.card:hover{transform:scale(1.1)}
 
-  .card:hover {
-    transform: scale(1.08);
-  }
+#deck,#discard{
+  width:85px;height:110px;
+  border:2px solid white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#222;
+  cursor:pointer;
+}
 
-  /* DECK / DISCARD */
-  #deck, #discard {
-    width: 80px;
-    height: 110px;
-    border: 2px solid white;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: #1a1a1a;
-    cursor: pointer;
-    border-radius: 6px;
-  }
+#hand,#opponentHand{
+  min-height:100px;
+  padding:10px;
+}
 
-  #discard {
-    background: #111;
-  }
+#restartBtn{
+  display:none;
+  padding:10px;
+  margin:10px;
+}
 
-  /* BUTTON */
-  #ghouliesBtn {
-    margin-top: 10px;
-    padding: 10px 14px;
-    font-size: 16px;
-    cursor: pointer;
-  }
-
-  /* MOBILE FIX */
-  @media (max-width: 600px) {
-    .card {
-      width: 55px;
-    }
-
-    #status {
-      font-size: 18px;
-    }
-
-    #deck, #discard {
-      width: 65px;
-      height: 90px;
-    }
-
-    .row {
-      gap: 8px;
-    }
-  }
+@media(max-width:600px){
+  .card{width:55px}
+  #deck,#discard{width:70px;height:95px}
+}
 </style>
 </head>
 
 <body>
 
-<div id="status">Connecting...</div>
-
+<div id="status"></div>
 <div id="scores"></div>
 
 <button id="restartBtn">Play Again</button>
 
-<!-- OPPONENT -->
 <div class="row">
   <div id="opponentHand"></div>
 </div>
 
-<!-- CENTER -->
 <div class="row">
   <div id="deck">Deck</div>
   <div id="discard">Discard</div>
 </div>
 
-<!-- PLAYER -->
 <div class="row">
   <div id="hand"></div>
 </div>
 
-<!-- ACTION -->
+<div id="pending"></div>
+
 <div class="row">
   <button id="ghouliesBtn">Call Ghoulies</button>
 </div>

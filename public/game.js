@@ -4,21 +4,16 @@ let myId = null;
 
 socket.emit("join", "room1");
 
-socket.on("you", (id) => {
-  myId = id;
-});
+socket.on("you", id => myId = id);
 
-socket.on("state", (g) => {
+socket.on("state", g => {
   state = g;
   render();
 });
 
-function opponentId(){
-  if (!state?.order) return null;
-  return state.order.find(id => id !== myId);
-}
+function me(){ return state.players?.[myId]; }
+function oppId(){ return state.order?.find(id => id !== myId); }
 
-/* CARD IMAGE */
 function file(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
@@ -26,75 +21,58 @@ function file(card){
   return `/cards/${map[s]}${v.padStart(2,"0")}.png`;
 }
 
-function back(){
-  return "/cards/back.png";
-}
+function back(){ return "/cards/back.png"; }
 
-/* RENDER */
 function render(){
-  if (!state || !myId) return;
+  if (!state) return;
 
-  const me = state.players?.[myId];
-  const opp = state.players?.[opponentId()];
+  const p = me();
+  const o = state.players?.[oppId()];
 
-  const isTurn = state.order[state.turn] === myId;
+  const turn = state.order[state.turn] === myId;
 
   document.getElementById("status").innerText =
-    isTurn ? "Your turn" : "Their turn";
+    turn ? "Your turn" : "Their turn";
 
-  /* SCORES (NO DUPLICATES) */
-  const scoresEl = document.getElementById("scores");
-  scoresEl.innerHTML = `
-    <div>You: ${state.scores?.[myId] || 0}</div>
-    <div>Opponent: ${state.scores?.[opponentId()] || 0}</div>
-  `;
+  document.getElementById("scores").innerHTML =
+    `You: ${state.scores[myId] || 0} | Opponent: ${state.scores[oppId()] || 0}`;
 
-  /* PLAY AGAIN BUTTON */
-  const btn = document.getElementById("restartBtn");
-  btn.style.display = state.gameOver ? "block" : "none";
+  document.getElementById("restartBtn").style.display =
+    state.gameOver ? "block" : "none";
 
-  /* YOUR HAND */
   document.getElementById("hand").innerHTML =
-    me?.hand?.map(c =>
-      `<img class="card" data-card="${c}" src="${back()}">`
-    ).join("") || "";
+    p?.hand?.map(c => `<img class="card" data-card="${c}" src="${back()}">`).join("") || "";
 
-  /* OPPONENT HAND */
   document.getElementById("opponentHand").innerHTML =
-    opp?.hand?.map(() =>
-      `<img class="card" src="${back()}">`
-    ).join("") || "";
+    o?.hand?.map(() => `<img class="card" src="${back()}">`).join("") || "";
 
-  /* DISCARD */
   const top = state.discard?.at(-1);
   document.getElementById("discard").innerHTML =
     top ? `<img class="card" src="${file(top)}">` : "";
+
+  const pending = p?.pending;
+  document.getElementById("pending").innerHTML =
+    pending ? `Drawn: ${pending}` : "";
 }
 
-/* INPUT */
-document.addEventListener("click", (e) => {
-
+document.addEventListener("click", e => {
   if (!state) return;
-
-  if (state.gameOver) return;
 
   if (e.target.id === "deck") socket.emit("draw");
 
-  if (e.target.closest("#discard"))
-    socket.emit("takeDiscard");
+  if (e.target.closest("#discard")) socket.emit("takeDiscard");
 
-  if (e.target.dataset.card && state.players?.[myId]?.pending)
+  if (e.target.dataset.card && me()?.pending)
     socket.emit("swap", e.target.dataset.card);
 
-  if (e.target.id === "ghouliesBtn")
-    socket.emit("callGhoulies");
-
   if (e.target.id === "restartBtn")
-    socket.emit("restartGame", "room1");
+    socket.emit("restart", "room1");
+
+  if (e.target.id === "ghouliesBtn")
+    socket.emit("snap");
 });
 
-/* SNAP */
-document.addEventListener("dblclick", (e) => {
-  const card = e.target.dataset.card;
-  if (card) socket.emit("snap", card);
+document.addEventListener("dblclick", e => {
+  const c = e.target.dataset.card;
+  if (c) socket.emit("snap", c);
 });
