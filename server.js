@@ -26,8 +26,8 @@ function createDeck(){
 }
 
 function value(card){
-  const v = card.slice(0,-1);
-  const s = card.slice(-1);
+  const v=card.slice(0,-1);
+  const s=card.slice(-1);
 
   if(v==="A") return 1;
   if(v==="J"||v==="Q"||v==="K"){
@@ -101,7 +101,7 @@ function startPeek(room,g){
 function endRound(game,room){
 
   for(const id in game.players){
-    game.scores[id] = (game.scores[id]||0) +
+    game.scores[id]=(game.scores[id]||0)+
       game.players[id].hand.reduce((a,c)=>a+value(c),0);
   }
 
@@ -116,7 +116,7 @@ function endRound(game,room){
   game.specialMode=null;
 
   for(const id in game.players){
-    game.players[id].hand = deck.splice(0,4);
+    game.players[id].hand=deck.splice(0,4);
     game.players[id].pending=null;
     game.players[id].peek=[];
     game.players[id].revealed=false;
@@ -148,7 +148,7 @@ io.on("connection",(socket)=>{
       };
 
       g.order.push(socket.id);
-      g.scores = g.scores || {};
+      g.scores=g.scores||{};
       g.scores[socket.id]=0;
     }
 
@@ -173,7 +173,6 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* DISCARD */
   socket.on("takeDiscard",()=>{
     const game=g();
     if(!canAct(game)) return;
@@ -199,7 +198,7 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* 🔥 SWAP + 10 FIX */
+  /* 🔥 FIXED SWAP WITH EXPLICIT 10 DETECTION */
   socket.on("swap",(card)=>{
     const game=g();
     if(!canAct(game)||!isTurn()) return;
@@ -209,27 +208,29 @@ io.on("connection",(socket)=>{
     const i=p.hand.indexOf(card);
     if(i===-1) return;
 
-    const old=p.hand[i];
+    const drawn=p.pending;
+    const swappedCard=p.hand[i];
 
-    p.hand[i]=p.pending;
-    game.discard.push(old);
+    /* detect 10 BEFORE mutation */
+    const isTen = swappedCard === "10♠" || swappedCard==="10♥" || swappedCard==="10♦" || swappedCard==="10♣"
+                  || swappedCard.startsWith("10");
+
+    p.hand[i]=drawn;
+    game.discard.push(swappedCard);
     p.pending=null;
 
-    /* 10 RULE FIXED */
-    if(old.startsWith("10")){
+    if(isTen){
       game.specialMode={
         player:socket.id,
         step:1,
-        card:old
+        card:swappedCard
       };
       io.to(currentRoom).emit("state",game);
       return;
     }
 
-    /* TURN LOGIC */
     if(game.roundEnding){
       game.finalTurns--;
-
       if(game.finalTurns<=0){
         endRound(game,currentRoom);
         return;
@@ -241,7 +242,7 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* 10 STEP 1 */
+  /* 10 RULE */
   socket.on("tenOwn",(card)=>{
     const game=g();
     if(!game.specialMode) return;
@@ -252,7 +253,6 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* 10 STEP 2 */
   socket.on("tenOpp",(card)=>{
     const game=g();
     const p=game.players[socket.id];
@@ -274,15 +274,13 @@ io.on("connection",(socket)=>{
     io.to(currentRoom).emit("state",game);
   });
 
-  /* GHOULIES FIXED */
+  /* GHOULIES */
   socket.on("callGhoulies",()=>{
     const game=g();
     if(game.ghoulies) return;
 
     game.ghoulies=true;
     game.roundEnding=true;
-
-    /* CURRENT PLAYER FINISHES, OPP GETS 1 TURN */
     game.finalTurns=1;
 
     nextTurn(game);
