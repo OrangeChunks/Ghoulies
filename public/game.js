@@ -43,8 +43,22 @@ function render(){
 
   const isTurn = state.order[state.turn] === myId;
 
+  /* TURN TEXT */
   document.getElementById("status").innerText =
     isTurn ? "🎯 Your turn" : "⏳ Their turn";
+
+  /* SHOW DRAWN CARD (KEY FIX) */
+  const drawArea = document.getElementById("drawn");
+
+  if(p.pendingDraw){
+    drawArea.innerHTML = `
+      <div>Picked up:</div>
+      <img src="${file(p.pendingDraw)}" class="card">
+      <div style="font-size:12px;">(Click discard to drop it, or click a card to swap)</div>
+    `;
+  } else {
+    drawArea.innerHTML = "";
+  }
 
   /* DISCARD */
   const top = state.discard.at(-1);
@@ -71,9 +85,7 @@ function render(){
   document.getElementById("scores").innerHTML = html;
 }
 
-/* =========================
-   CLICK HANDLER (FIXED)
-========================= */
+/* CLICK */
 document.addEventListener("click",(e)=>{
 
   if(!state || !myId) return;
@@ -81,21 +93,17 @@ document.addEventListener("click",(e)=>{
   const p = me();
   if(!p) return;
 
-  /* ✅ GHOULIES ALWAYS WORKS */
+  /* GHOULIES ALWAYS WORKS */
   if(e.target.id === "ghouliesBtn"){
-    console.log("Ghoulies clicked");
     socket.emit("callGhoulies");
     return;
   }
 
   const isTurn = state.order[state.turn] === myId;
-
-  /* ❌ block gameplay clicks if not your turn */
   if(!isTurn) return;
 
   /* DRAW */
   if(e.target.id === "deck"){
-    console.log("Draw clicked");
     socket.emit("draw");
     return;
   }
@@ -106,26 +114,21 @@ document.addEventListener("click",(e)=>{
     const top = state.discard.at(-1);
 
     if(!p.pendingDraw){
-      console.log("Take discard");
       socket.emit("takeDiscard", top);
     } else {
-      console.log("Reject draw");
       socket.emit("rejectDraw");
     }
 
     return;
   }
 
-  /* HAND */
+  /* SWAP */
   if(e.target.dataset.card && p.pendingDraw){
-    console.log("Swap", e.target.dataset.card);
     socket.emit("swap", e.target.dataset.card);
   }
 });
 
-/* =========================
-   SNAP (ANYTIME)
-========================= */
+/* SNAP */
 document.addEventListener("dblclick",(e)=>{
 
   if(!state) return;
@@ -133,6 +136,5 @@ document.addEventListener("dblclick",(e)=>{
   const card = e.target.dataset.card;
   if(!card) return;
 
-  console.log("Snap attempt:", card);
   socket.emit("snap",card);
 });
