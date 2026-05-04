@@ -33,8 +33,9 @@ function opp(){
 function file(card){
   const v = card.slice(0,-1);
   const s = card.slice(-1);
-  const map = { "♠":"s","♥":"h","♦":"d","♣":"c" };
-  return `/cards/${map[s]}${v.padStart(2,"0")}.png`;
+
+  const suit = { "♠":"s","♥":"h","♦":"d","♣":"c" }[s];
+  return `/cards/${suit}${v.padStart(2,"0")}.png`;
 }
 
 function back(){
@@ -67,16 +68,11 @@ function render(){
     p.hand.map(c => `<img class="card" data-card="${c}" src="${back()}">`).join("");
 
   document.getElementById("opponentHand").innerHTML =
-    o ? o.hand.map(c => `<img class="card" src="${back()}">`).join("") : "";
+    o ? o.hand.map(() => `<img class="card" src="${back()}">`).join("") : "";
 
   const top = state.discard.at(-1);
   document.getElementById("discard").innerHTML =
     top ? `<img class="card" src="${file(top)}">` : "";
-
-  document.getElementById("scores").innerHTML =
-    Object.keys(state.players || {}).map(id =>
-      `<div>${id === myId ? "You" : "Opponent"}: ${state.scores[id] || 0}</div>`
-    ).join("");
 }
 
 /* INPUT */

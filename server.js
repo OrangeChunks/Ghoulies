@@ -8,10 +8,22 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
+/* 🚨 CRASH SAFETY */
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT ERROR:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("UNHANDLED REJECTION:", err);
+});
+
+/* CARDS */
 const SUITS = ["♠", "♥", "♦", "♣"];
 const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
-function shuffle(a){ return a.sort(() => Math.random() - 0.5); }
+function shuffle(a){
+  return a.sort(() => Math.random() - 0.5);
+}
 
 function createDeck(){
   let d = [];
@@ -27,6 +39,7 @@ function deepClone(obj){
   return JSON.parse(JSON.stringify(obj));
 }
 
+/* GAME STATE */
 function newGame(){
   const deck = createDeck();
 
@@ -41,15 +54,13 @@ function newGame(){
     gameOver: false,
     loser: null,
 
-    specialMode: null,
-    roundEnding: false,
-    finalTurns: 0
+    roundEnding: false
   };
 }
 
 const rooms = {};
 
-/* 🔥 SAFE ROOM GETTER (FIXES 502 CRASHES) */
+/* SAFE ROOM ACCESS */
 function getRoom(socket){
   const roomId = [...socket.rooms].find(r => r !== socket.id);
   if (!roomId) return null;
@@ -60,23 +71,7 @@ function getRoomId(socket){
   return [...socket.rooms].find(r => r !== socket.id);
 }
 
-function endGame(roomId, g){
-  let loser = null;
-  let max = -1;
-
-  for (let id in g.scores){
-    if (g.scores[id] > max){
-      max = g.scores[id];
-      loser = id;
-    }
-  }
-
-  g.gameOver = true;
-  g.loser = loser;
-
-  io.to(roomId).emit("state", deepClone(g));
-}
-
+/* SOCKETS */
 io.on("connection", (socket) => {
 
   socket.on("join", (roomId) => {
@@ -86,6 +81,7 @@ io.on("connection", (socket) => {
     }
 
     const g = rooms[roomId];
+
     socket.join(roomId);
 
     if (!g.players[socket.id] && Object.keys(g.players).length < 2){
@@ -100,10 +96,6 @@ io.on("connection", (socket) => {
 
     socket.emit("you", socket.id);
     socket.emit("state", deepClone(g));
-
-    if (Object.keys(g.players).length === 2){
-      io.to(roomId).emit("state", deepClone(g));
-    }
   });
 
   const isTurn = (g) => g.order[g.turn] === socket.id;
@@ -113,8 +105,7 @@ io.on("connection", (socket) => {
     if (!g || g.gameOver) return;
     if (!isTurn(g)) return;
 
-    const p = g.players[socket.id];
-    p.pending = g.deck.pop();
+    g.players[socket.id].pending = g.deck.pop();
 
     io.to(getRoomId(socket)).emit("state", deepClone(g));
   });
@@ -124,6 +115,7 @@ io.on("connection", (socket) => {
     if (!g) return;
 
     const p = g.players[socket.id];
+
     if (!p.pending && g.discard.length){
       p.pending = g.discard.pop();
     }
@@ -136,6 +128,7 @@ io.on("connection", (socket) => {
     if (!g) return;
 
     const p = g.players[socket.id];
+
     if (p.pending){
       g.discard.push(p.pending);
       p.pending = null;
@@ -177,18 +170,6 @@ io.on("connection", (socket) => {
     io.to(getRoomId(socket)).emit("state", deepClone(g));
   });
 
-  socket.on("callGhoulies", () => {
-    const g = getRoom(socket);
-    if (!g || g.roundEnding) return;
-
-    g.roundEnding = true;
-    g.finalTurns = 1;
-
-    g.turn = (g.turn + 1) % g.order.length;
-
-    io.to(getRoomId(socket)).emit("state", deepClone(g));
-  });
-
   socket.on("restartGame", (roomId) => {
     const old = rooms[roomId];
     if (!old) return;
@@ -204,11 +185,7 @@ io.on("connection", (socket) => {
 
       scores: {},
       gameOver: false,
-      loser: null,
-
-      specialMode: null,
-      roundEnding: false,
-      finalTurns: 0
+      loser: null
     };
 
     const g = rooms[roomId];
@@ -224,4 +201,9 @@ io.on("connection", (socket) => {
 
 });
 
-server.listen(3000, () => console.log("Server running"));
+/* 🚨 CRITICAL FIX FOR 502 */
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
