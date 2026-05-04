@@ -1,12 +1,24 @@
 let socket = io();
 let state = null;
 let myId = null;
+let initialised = false;
 
 socket.emit("join", "room1");
 
-socket.on("you", (id) => (myId = id));
+socket.on("you", (id) => {
+  myId = id;
+  document.getElementById("endScreen")?.classList.add("hidden");
+});
+
 socket.on("state", (g) => {
   state = g;
+
+  // 🔥 FIX: remove stuck overlay on first valid state
+  if (!initialised) {
+    document.getElementById("endScreen")?.classList.add("hidden");
+    initialised = true;
+  }
+
   render();
 });
 
@@ -15,7 +27,7 @@ function me() {
 }
 
 function opp() {
-  return Object.entries(state.players).find(([id]) => id !== myId)?.[1];
+  return Object.entries(state.players || {}).find(([id]) => id !== myId)?.[1];
 }
 
 /* 🎴 CARD IMAGE */
@@ -39,7 +51,7 @@ function back() {
   return "/cards/back.png";
 }
 
-/* 🧠 MAIN RENDER */
+/* 🧠 RENDER */
 function render() {
   if (!state || !myId) return;
 
@@ -52,11 +64,11 @@ function render() {
   document.getElementById("status").innerText =
     isTurn ? "Your turn" : "Their turn";
 
-  /* 🏁 END SCREEN (FIXED - NO STUCK OVERLAY) */
+  /* 🏁 END SCREEN (FIXED PROPERLY) */
   const endScreen = document.getElementById("endScreen");
   const endText = document.getElementById("endText");
 
-  if (state.gameOver) {
+  if (state.gameOver === true) {
     endText.innerText =
       state.loser === myId ? "YOU LOSE 💀" : "YOU WIN 🎉";
 
@@ -105,10 +117,7 @@ function render() {
         .map((c) => {
           let style = "";
 
-          if (
-            state.specialMode &&
-            state.specialMode.step === 2
-          ) {
+          if (state.specialMode && state.specialMode.step === 2) {
             style = "border:2px solid red; transform:scale(1.05);";
           }
 
@@ -118,7 +127,9 @@ function render() {
     : "";
 
   /* 📊 SCORES */
-  document.getElementById("scores").innerHTML = Object.keys(state.players)
+  document.getElementById("scores").innerHTML = Object.keys(
+    state.players || {}
+  )
     .map((id) => {
       const label = id === myId ? "You" : "Opponent";
       return `<div>${label}: ${state.scores[id] || 0}</div>`;
@@ -126,17 +137,16 @@ function render() {
     .join("");
 }
 
-/* 🎮 CLICK HANDLER */
+/* 🎮 INPUTS */
 document.addEventListener("click", (e) => {
   if (!state) return;
 
   const p = me();
   const isTurn = state.order[state.turn] === myId;
 
-  /* ❌ BLOCK INPUT ONLY WHEN GAME OVER */
-  if (state.gameOver) return;
+  if (state.gameOver === true) return;
 
-  /* 🧠 10 RULE */
+  /* 10 RULE */
   if (state.specialMode) {
     if (state.specialMode.step === 1 && e.target.dataset.card) {
       socket.emit("tenOwn", e.target.dataset.card);
@@ -149,35 +159,36 @@ document.addEventListener("click", (e) => {
     }
   }
 
-  /* 🃏 DRAW */
+  /* DRAW */
   if (e.target.id === "deck" && isTurn) {
     socket.emit("draw");
   }
 
-  /* 🗑 DISCARD */
+  /* DISCARD */
   if (e.target.closest("#discard")) {
     if (!p.pending) socket.emit("takeDiscard");
     else socket.emit("reject");
   }
 
-  /* 🔁 SWAP */
+  /* SWAP */
   if (e.target.dataset.card && p.pending && isTurn) {
     socket.emit("swap", e.target.dataset.card);
   }
 
-  /* ☠️ GHOULIES */
+  /* GHOULIES */
   if (e.target.id === "ghouliesBtn") {
     socket.emit("callGhoulies");
   }
 
-  /* 🔁 RESTART (FIXED) */
+  /* 🔁 RESTART FIX (THIS WAS YOUR MAIN BUG) */
   if (e.target.id === "restartBtn") {
-    document.getElementById("endScreen").classList.add("hidden"); // immediate UI clear
+    document.getElementById("endScreen").classList.add("hidden");
+
     socket.emit("restartGame", "room1");
   }
 });
 
-/* ⚡ SNAP */
+/* SNAP */
 document.addEventListener("dblclick", (e) => {
   if (state?.gameOver) return;
 
