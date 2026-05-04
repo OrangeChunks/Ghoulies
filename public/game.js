@@ -39,7 +39,7 @@ function back() {
   return "/cards/back.png";
 }
 
-/* 🧠 RENDER */
+/* 🧠 MAIN RENDER */
 function render() {
   if (!state || !myId) return;
 
@@ -49,19 +49,20 @@ function render() {
 
   const isTurn = state.order[state.turn] === myId;
 
-  document.getElementById("status").innerText = isTurn
-    ? "Your turn"
-    : "Their turn";
+  document.getElementById("status").innerText =
+    isTurn ? "Your turn" : "Their turn";
 
-  /* 🏁 END SCREEN */
+  /* 🏁 END SCREEN (FIXED - NO STUCK OVERLAY) */
+  const endScreen = document.getElementById("endScreen");
+  const endText = document.getElementById("endText");
+
   if (state.gameOver) {
-    const end = document.getElementById("endScreen");
-    const txt = document.getElementById("endText");
+    endText.innerText =
+      state.loser === myId ? "YOU LOSE 💀" : "YOU WIN 🎉";
 
-    txt.innerText = state.loser === myId ? "YOU LOSE 💀" : "YOU WIN 🎉";
-    end.classList.remove("hidden");
+    endScreen.classList.remove("hidden");
   } else {
-    document.getElementById("endScreen").classList.add("hidden");
+    endScreen.classList.add("hidden");
   }
 
   /* 🃏 DRAW / PEEK */
@@ -117,26 +118,25 @@ function render() {
     : "";
 
   /* 📊 SCORES */
-  const scoreBox = document.getElementById("scores");
-
-  if (state.scores) {
-    scoreBox.innerHTML = Object.keys(state.players)
-      .map((id) => {
-        const label = id === myId ? "You" : "Opponent";
-        return `<div>${label}: ${state.scores[id] || 0}</div>`;
-      })
-      .join("");
-  }
+  document.getElementById("scores").innerHTML = Object.keys(state.players)
+    .map((id) => {
+      const label = id === myId ? "You" : "Opponent";
+      return `<div>${label}: ${state.scores[id] || 0}</div>`;
+    })
+    .join("");
 }
 
-/* 🎮 CLICK INPUTS */
+/* 🎮 CLICK HANDLER */
 document.addEventListener("click", (e) => {
-  if (!state || state.gameOver) return;
+  if (!state) return;
 
   const p = me();
   const isTurn = state.order[state.turn] === myId;
 
-  /* 🧠 10 RULE STEP */
+  /* ❌ BLOCK INPUT ONLY WHEN GAME OVER */
+  if (state.gameOver) return;
+
+  /* 🧠 10 RULE */
   if (state.specialMode) {
     if (state.specialMode.step === 1 && e.target.dataset.card) {
       socket.emit("tenOwn", e.target.dataset.card);
@@ -170,13 +170,14 @@ document.addEventListener("click", (e) => {
     socket.emit("callGhoulies");
   }
 
-  /* 🔁 RESTART */
+  /* 🔁 RESTART (FIXED) */
   if (e.target.id === "restartBtn") {
+    document.getElementById("endScreen").classList.add("hidden"); // immediate UI clear
     socket.emit("restartGame", "room1");
   }
 });
 
-/* ⚡ SNAP (DOUBLE CLICK) */
+/* ⚡ SNAP */
 document.addEventListener("dblclick", (e) => {
   if (state?.gameOver) return;
 
