@@ -21,13 +21,16 @@
     .card {
       width: 80px;
       cursor: pointer;
+      transition: transform 0.2s;
     }
 
-    .card-back {
-      width: 80px;
-      height: 120px;
-      background: black;
-      border-radius: 8px;
+    .card:hover {
+      transform: scale(1.1);
+    }
+
+    #hand img:hover {
+      transform: scale(1.2);
+      outline: 2px solid red;
     }
 
     #hand, #opponent {
@@ -41,6 +44,7 @@
       padding: 10px 20px;
       font-size: 16px;
       margin: 10px;
+      cursor: pointer;
     }
 
     #scores {
