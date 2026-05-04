@@ -7,8 +7,12 @@ socket.emit("join","room1");
 socket.on("you",(id)=>myId=id);
 socket.on("state",(g)=>{state=g;render();});
 
-function me(){return state.players[myId];}
-function opp(){return Object.values(state.players).find(p=>p!==me());}
+function me(){ return state.players[myId]; }
+
+function opp(){
+  return Object.entries(state.players)
+    .find(([id])=>id!==myId)?.[1];
+}
 
 function file(c){
   const v=c.slice(0,-1);
@@ -18,7 +22,7 @@ function file(c){
   return `/cards/${suit[s]}${map[v]||v.padStart(2,"0")}.png`;
 }
 
-function back(){return "/cards/back.png";}
+function back(){ return "/cards/back.png"; }
 
 function render(){
   if(!state || !myId) return;
@@ -26,16 +30,15 @@ function render(){
   const p = me();
   const o = opp();
 
-  const isTurn = state.order[state.turn] === myId;
+  const isTurn = state.order[state.turn]===myId;
 
   document.getElementById("status").innerText =
     isTurn ? "Your turn" : "Their turn";
 
-  /* 🔥 SPECIAL MODE */
   const special = state.specialMode;
   const step = special?.step;
 
-  /* 👀 PEEK / DRAWN */
+  /* 👀 PEEK / DRAW */
   if(state.peekActive && p.revealed){
     document.getElementById("drawn").innerHTML =
       p.peek.map(c=>`<img src="${file(c)}" class="card">`).join("");
@@ -44,34 +47,43 @@ function render(){
       p.pending ? `<img src="${file(p.pending)}" class="card">` : "";
   }
 
-  /* 🂠 DISCARD */
+  /* DISCARD */
   const top = state.discard.at(-1);
   document.getElementById("discard").innerHTML =
     top ? `<img src="${file(top)}" class="card">` : "";
 
-  /* 🟥 YOUR HAND */
+  /* YOUR HAND */
   document.getElementById("hand").innerHTML =
     p.hand.map(c=>{
       let style="";
-
       if(special && step===1 && special.player===myId){
         style="border:3px solid red;";
       }
-
       return `<img class="card" data-card="${c}" src="${back()}" style="${style}">`;
     }).join("");
 
-  /* 🟥 OPPONENT HAND */
+  /* OPPONENT HAND */
   document.getElementById("opponentHand").innerHTML =
-    o.hand.map(c=>{
+    o ? o.hand.map(c=>{
       let style="";
-
       if(special && step===2){
         style="border:3px solid red;";
       }
-
       return `<img class="card" data-card="${c}" src="${back()}" style="${style}">`;
+    }).join("") : "";
+
+  /* 🧮 SCOREBOARD (FIX) */
+  if(state.scores){
+    const players = Object.keys(state.players);
+
+    const scoreHTML = players.map(id=>{
+      const label = id===myId ? "You" : "Opponent";
+      const score = state.scores[id] || 0;
+      return `<div><strong>${label}:</strong> ${score}</div>`;
     }).join("");
+
+    document.getElementById("scores").innerHTML = scoreHTML;
+  }
 }
 
 /* INPUT */
@@ -80,9 +92,9 @@ document.addEventListener("click",(e)=>{
   if(!state) return;
 
   const p = me();
-  const isTurn = state.order[state.turn] === myId;
+  const isTurn = state.order[state.turn]===myId;
 
-  /* 🔥 10 MODE INPUT */
+  /* 10 MODE */
   if(state.specialMode){
 
     if(state.specialMode.step===1 && e.target.dataset.card){
@@ -96,7 +108,7 @@ document.addEventListener("click",(e)=>{
     }
   }
 
-  /* NORMAL GAME */
+  /* NORMAL */
 
   if(e.target.id==="deck"){
     if(isTurn) socket.emit("draw");
