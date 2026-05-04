@@ -10,57 +10,51 @@ body{
   color:white;
   font-family:Arial;
   margin:0;
+  text-align:center;
 }
 
+/* MAIN LAYOUT */
 #table{
   display:flex;
   flex-direction:column;
-  height:100vh;
   justify-content:space-between;
-  align-items:center;
-  padding:10px;
-}
-
-/* CENTER AREA */
-#center{
-  display:flex;
-  gap:20px;
-  align-items:center;
-  justify-content:center;
-}
-
-/* PLAYERS */
-#opponentArea,#playerArea{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:10px;
+  height:100vh;
+  padding:15px;
 }
 
 /* HANDS */
 .hand{
   display:flex;
-  gap:6px;
-  flex-wrap:wrap;
   justify-content:center;
+  gap:8px;
+  flex-wrap:wrap;
 }
 
-/* CARDS */
+/* CARD STYLE */
 .card{
-  width:60px;
-  cursor:pointer;
+  width:70px;
   transition:0.2s;
+  cursor:pointer;
 }
 
 .card:hover{
   transform:scale(1.1);
 }
 
+/* CENTER AREA */
+#centerRow{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:40px;
+  margin:20px 0;
+}
+
 /* BUTTON */
 button{
-  padding:12px;
+  padding:14px 20px;
   font-size:16px;
-  margin:10px;
+  margin-top:15px;
 }
 
 button:disabled{
@@ -68,6 +62,7 @@ button:disabled{
   cursor:not-allowed;
 }
 
+/* SCORE PANEL */
 #scores{
   position:absolute;
   right:10px;
@@ -75,6 +70,7 @@ button:disabled{
   background:rgba(0,0,0,0.3);
   padding:10px;
   border-radius:10px;
+  font-size:14px;
 }
 </style>
 </head>
@@ -83,34 +79,34 @@ button:disabled{
 
 <div id="table">
 
-<!-- OPPONENT -->
-<div id="opponentArea">
-  <h3>Opponent</h3>
-  <div id="opponentHand" class="hand"></div>
-</div>
+  <!-- OPPONENT -->
+  <div>
+    <h3>Opponent</h3>
+    <div id="opponentHand" class="hand"></div>
+  </div>
 
-<!-- CENTER -->
-<div id="center">
+  <!-- CENTER (DECK + DISCARD) -->
+  <div id="centerRow">
+    <img id="deck" src="/cards/back.png" class="card">
+    <div id="discard"></div>
+  </div>
 
-  <img id="deck" src="/cards/back.png" class="card">
+  <h2 id="status"></h2>
 
-  <div id="discard"></div>
+  <div id="drawn"></div>
 
-</div>
+  <!-- YOUR HAND -->
+  <div>
+    <h3>You</h3>
+    <div id="hand" class="hand"></div>
+  </div>
 
-<h2 id="status"></h2>
+  <!-- BUTTON -->
+  <div>
+    <button id="ghouliesBtn">Call Ghoulies 👻</button>
+  </div>
 
-<div id="drawn"></div>
-
-<button id="ghouliesBtn">Call Ghoulies 👻</button>
-
-<!-- PLAYER -->
-<div id="playerArea">
-  <h3>You</h3>
-  <div id="hand" class="hand"></div>
-</div>
-
-<div id="scores"></div>
+  <div id="scores"></div>
 
 </div>
 
