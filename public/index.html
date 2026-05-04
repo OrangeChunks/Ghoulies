@@ -2,6 +2,52 @@
 <html>
 <head>
   <title>Ghoulies 🎴</title>
+
+  <style>
+    body {
+      background: #0b3d2e;
+      color: white;
+      text-align: center;
+      font-family: Arial;
+    }
+
+    #board {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin: 20px;
+    }
+
+    .card {
+      width: 80px;
+      cursor: pointer;
+    }
+
+    .card-back {
+      width: 80px;
+      height: 120px;
+      background: black;
+      border-radius: 8px;
+    }
+
+    #hand, #opponent {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 20px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+    }
+
+    #scores {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+  </style>
 </head>
 
 <body>
@@ -9,7 +55,7 @@
 <h1>Ghoulies 🎴</h1>
 
 <div id="board">
-  <div id="deck">🂠</div>
+  <img id="deck" src="/cards/back.png" class="card">
   <div id="discard"></div>
 </div>
 

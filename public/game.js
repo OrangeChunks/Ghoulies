@@ -19,6 +19,18 @@ function opp(){
   return Object.values(state.players).find(p=>p.id!==myId);
 }
 
+/* CARD IMAGE PATH */
+function file(card){
+  const v = card.slice(0,-1);
+  const s = card.slice(-1);
+
+  const suit = {"♠":"s","♥":"h","♦":"d","♣":"c"};
+  const map = {A:"01",J:"11",Q:"12",K:"13"};
+
+  return `/cards/${suit[s]}${map[v]||v.padStart(2,"0")}.png`;
+}
+
+/* RENDER */
 function render(){
 
   if(!state) return;
@@ -29,22 +41,31 @@ function render(){
   document.getElementById("status").innerText =
     isTurn ? "🎯 Your turn" : "⏳ Their turn";
 
+  /* DISCARD */
   const top = state.discard.at(-1);
 
-  document.getElementById("discard").innerText = top || "";
+  document.getElementById("discard").innerHTML =
+    top ? `<img src="${file(top)}" class="card">` : "";
 
+  /* HAND */
   document.getElementById("hand").innerHTML =
-    p.hand.map(c=>`<button data-card="${c}">${c}</button>`).join("");
+    p.hand.map(c =>
+      `<img src="${file(c)}" data-card="${c}" class="card">`
+    ).join("");
 
+  /* OPPONENT */
   const o = opp();
 
   document.getElementById("opponent").innerHTML =
-    o.hand.map(()=>`<span>🂠</span>`).join("");
+    o.hand.map(()=>`<img src="/cards/back.png" class="card">`).join("");
 
+  /* SCORES */
   let html = "<h3>Scores</h3>";
+
   for(const id in state.scores){
     html += `<div>${id===myId?"You":"Opponent"}: ${state.scores[id]}</div>`;
   }
+
   document.getElementById("scores").innerHTML = html;
 }
 
@@ -54,7 +75,7 @@ document.addEventListener("click",(e)=>{
   const p = me();
   if(!p) return;
 
-  /* ✅ GHOULIES ALWAYS WORKS */
+  /* GHOULIES ALWAYS WORKS */
   if(e.target.id === "ghouliesBtn"){
     socket.emit("callGhoulies");
     return;
@@ -67,7 +88,8 @@ document.addEventListener("click",(e)=>{
     socket.emit("draw");
   }
 
-  if(e.target.id === "discard"){
+  if(e.target.closest("#discard")){
+
     const top = state.discard.at(-1);
 
     if(!p.pendingDraw){
