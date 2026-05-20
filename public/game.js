@@ -3,8 +3,9 @@ let socket = io();
 let state = null;
 let myId = null;
 
-/* memory peek system */
+/* MEMORY PHASE */
 let revealed = [];
+let memoryDone = false;
 
 socket.emit("join", "room1");
 
@@ -27,6 +28,7 @@ function oppId(){
 
 /* CARD IMAGE */
 function file(card){
+
   const v = card.slice(0,-1);
   const s = card.slice(-1);
 
@@ -70,9 +72,19 @@ function render(){
 
   const turn = state.order[state.turn] === myId;
 
-  document.getElementById("status").innerText =
-    turn ? "Your turn" : "Their turn";
+  /* STATUS */
+  if (!memoryDone){
 
+    document.getElementById("status").innerText =
+      `Choose 2 cards to memorise (${revealed.length}/2)`;
+
+  } else {
+
+    document.getElementById("status").innerText =
+      turn ? "Your turn" : "Their turn";
+  }
+
+  /* SCORES */
   document.getElementById("scores").innerHTML =
     `You: ${state.scores?.[myId] || 0}
      | Opponent: ${state.scores?.[oppId()] || 0}`;
@@ -107,7 +119,7 @@ function render(){
       ? `<img class="card" src="${file(top)}">`
       : "";
 
-  /* PENDING CARD */
+  /* PENDING */
   const pending = p?.pending;
 
   document.getElementById("pending").innerHTML =
@@ -120,6 +132,7 @@ function render(){
       `
       : "";
 
+  /* RESTART */
   document.getElementById("restartBtn").style.display =
     state.gameOver ? "block" : "none";
 }
@@ -129,24 +142,31 @@ document.addEventListener("click", e => {
 
   if (!state) return;
 
-  /* START ROUND MEMORY PEEK */
-  if (
-    e.target.dataset.index !== undefined &&
-    revealed.length < 2
-  ) {
-    const i = Number(e.target.dataset.index);
+  /* MEMORY PHASE */
+  if (!memoryDone){
 
-    if (!revealed.includes(i)){
-      revealed.push(i);
-      render();
+    if (e.target.dataset.index !== undefined){
 
-      /* after selecting 2 cards */
-      if (revealed.length === 2){
+      const i = Number(e.target.dataset.index);
 
-        setTimeout(() => {
-          revealed = [];
-          render();
-        }, 5000);
+      if (!revealed.includes(i)){
+
+        revealed.push(i);
+
+        render();
+
+        /* finished selecting 2 cards */
+        if (revealed.length === 2){
+
+          setTimeout(() => {
+
+            revealed = [];
+            memoryDone = true;
+
+            render();
+
+          }, 5000);
+        }
       }
     }
 
@@ -181,6 +201,8 @@ document.addEventListener("click", e => {
 
 /* SNAP */
 document.addEventListener("dblclick", e => {
+
+  if (!memoryDone) return;
 
   const c = e.target.dataset.card;
 
