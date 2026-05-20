@@ -1,217 +1,267 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
+let socket = io();
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+let state = null;
+let myId = null;
 
-app.use(express.static("public"));
+/* MEMORY PHASE */
+let revealed = [];
+let memoryDone = false;
 
-const SUITS = ["♠","♥","♦","♣"];
-const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+socket.emit("join", "room1");
 
-function shuffle(a){
-  return a.sort(() => Math.random() - 0.5);
+socket.on("you", id => {
+  myId = id;
+});
+
+socket.on("state", g => {
+  state = g;
+  render();
+});
+
+function me(){
+  return state.players?.[myId];
 }
 
-function createDeck(){
-  let d = [];
+function oppId(){
+  return state.order?.find(id => id !== myId);
+}
 
-  for (let s of SUITS){
-    for (let v of VALUES){
-      d.push(v + s);
-    }
+/* CARD IMAGE */
+function file(card){
+
+  const v = card.slice(0,-1);
+  const s = card.slice(-1);
+
+  const suitMap = {
+    "♠":"s",
+    "♥":"h",
+    "♦":"d",
+    "♣":"c"
+  };
+
+  const valueMap = {
+    "A":"01",
+    "2":"02",
+    "3":"03",
+    "4":"04",
+    "5":"05",
+    "6":"06",
+    "7":"07",
+    "8":"08",
+    "9":"09",
+    "10":"10",
+    "J":"11",
+    "Q":"12",
+    "K":"13"
+  };
+
+  return `/cards/${suitMap[s]}${valueMap[v]}.png`;
+}
+
+function back(){
+  return "/cards/back.png";
+}
+
+/* MAIN RENDER */
+function render(){
+
+  if (!state || !myId) return;
+
+  const p = me();
+  const o = state.players?.[oppId()];
+
+  const turn =
+    state.order[state.turn] === myId;
+
+  /* STATUS */
+  if (!memoryDone){
+
+    document.getElementById("status").innerText =
+      `Choose 2 cards to memorise (${revealed.length}/2)`;
+
+  } else {
+
+    document.getElementById("status").innerText =
+      turn ? "Your turn" : "Their turn";
   }
 
-  return shuffle(d);
+  /* SCORES */
+  document.getElementById("scores").innerHTML =
+    `You: ${state.scores?.[myId] || 0}
+     | Opponent: ${state.scores?.[oppId()] || 0}`;
+
+  /* YOUR HAND */
+  document.getElementById("hand").innerHTML =
+    p?.hand?.map((c,i) => {
+
+      const visible =
+        revealed.includes(i);
+
+      return `
+        <img
+          class="card"
+          data-card="${c}"
+          data-index="${i}"
+          src="${visible ? file(c) : back()}"
+        >
+      `;
+    }).join("") || "";
+
+  /* OPPONENT HAND */
+  document.getElementById("opponentHand").innerHTML =
+    o?.hand?.map((c,i) => {
+
+      return `
+        <img
+          class="card"
+          data-opp="${c}"
+          data-oppindex="${i}"
+          src="${back()}"
+        >
+      `;
+    }).join("") || "";
+
+  /* DISCARD */
+  const top = state.discard?.at(-1);
+
+  document.getElementById("discard").innerHTML =
+    top
+      ? `<img class="card" src="${file(top)}">`
+      : "";
+
+  /* PENDING */
+  const pending = p?.pending;
+
+  document.getElementById("pending").innerHTML =
+    pending
+      ? `
+        <div style="margin-top:10px">
+          You picked up:<br>
+          <img
+            class="card"
+            src="${file(pending)}"
+            style="width:80px"
+          >
+        </div>
+      `
+      : "";
+
+  /* RESTART */
+  document.getElementById("restartBtn").style.display =
+    state.gameOver
+      ? "block"
+      : "none";
 }
 
-function newGame(){
+/* CLICK EVENTS */
+document.addEventListener("click", e => {
 
-  const deck = createDeck();
+  if (!state) return;
 
-  return {
-    deck,
-    discard: [deck.pop()],
-    players: {},
-    order: [],
-    turn: 0,
-    scores: {},
-    gameOver: false,
+  /* MEMORY PHASE */
+  if (!memoryDone){
 
-    tenSwap: null
-  };
-}
+    if (e.target.dataset.index !== undefined){
 
-const rooms = {};
+      const i =
+        Number(e.target.dataset.index);
 
-function getRoom(socket){
-  const room = [...socket.rooms].find(r => r !== socket.id);
-  return rooms[room];
-}
+      if (!revealed.includes(i)){
 
-function roomId(socket){
-  return [...socket.rooms].find(r => r !== socket.id);
-}
+        revealed.push(i);
 
-io.on("connection", (socket) => {
+        render();
 
-  socket.on("join", room => {
+        if (revealed.length === 2){
 
-    if (!rooms[room]){
-      rooms[room] = newGame();
+          setTimeout(() => {
+
+            revealed = [];
+            memoryDone = true;
+
+            render();
+
+          }, 5000);
+        }
+      }
     }
 
-    const g = rooms[room];
+    return;
+  }
 
-    socket.join(room);
+  /* 🔥 10 STEP 1 */
+  if (
+    state.tenSwap &&
+    state.tenSwap.player === myId &&
+    state.tenSwap.step === 1 &&
+    e.target.dataset.card
+  ){
 
-    if (
-      !g.players[socket.id] &&
-      Object.keys(g.players).length < 2
-    ){
+    socket.emit(
+      "tenOwn",
+      e.target.dataset.card
+    );
 
-      g.players[socket.id] = {
-        hand: g.deck.splice(0,5),
-        pending: null
-      };
+    return;
+  }
 
-      g.order.push(socket.id);
-      g.scores[socket.id] = 0;
-    }
+  /* 🔥 10 STEP 2 */
+  if (
+    state.tenSwap &&
+    state.tenSwap.player === myId &&
+    state.tenSwap.step === 2 &&
+    e.target.dataset.opp
+  ){
 
-    socket.emit("you", socket.id);
+    socket.emit(
+      "tenOpp",
+      e.target.dataset.opp
+    );
 
-    io.to(room).emit("state", g);
-  });
-
-  const isTurn = g =>
-    g.order[g.turn] === socket.id;
+    return;
+  }
 
   /* DRAW */
-  socket.on("draw", () => {
-
-    const g = getRoom(socket);
-
-    if (!g || g.gameOver) return;
-    if (!isTurn(g)) return;
-
-    g.players[socket.id].pending = g.deck.pop();
-
-    io.to(roomId(socket)).emit("state", g);
-  });
+  if (e.target.id === "deck"){
+    socket.emit("draw");
+  }
 
   /* TAKE DISCARD */
-  socket.on("takeDiscard", () => {
+  if (e.target.closest("#discard")){
+    socket.emit("takeDiscard");
+  }
 
-    const g = getRoom(socket);
-    const p = g.players[socket.id];
-
-    if (!p.pending && g.discard.length){
-      p.pending = g.discard.pop();
-    }
-
-    io.to(roomId(socket)).emit("state", g);
-  });
-
-  /* SWAP */
-  socket.on("swap", card => {
-
-    const g = getRoom(socket);
-    const p = g.players[socket.id];
-
-    const i = p.hand.indexOf(card);
-
-    if (i === -1) return;
-
-    const old = p.hand[i];
-
-    p.hand[i] = p.pending;
-
-    g.discard.push(old);
-
-    p.pending = null;
-
-    /* 🔥 10 RULE */
-    if (old.startsWith("10")){
-
-      g.tenSwap = {
-        player: socket.id,
-        step: 1,
-        ownCard: null
-      };
-
-    } else {
-
-      g.turn =
-        (g.turn + 1) % g.order.length;
-    }
-
-    io.to(roomId(socket)).emit("state", g);
-  });
-
-  /* 10 SELECT OWN */
-  socket.on("tenOwn", card => {
-
-    const g = getRoom(socket);
-
-    if (!g.tenSwap) return;
-
-    g.tenSwap.ownCard = card;
-    g.tenSwap.step = 2;
-
-    io.to(roomId(socket)).emit("state", g);
-  });
-
-  /* 10 SELECT OPPONENT */
-  socket.on("tenOpp", oppCard => {
-
-    const g = getRoom(socket);
-
-    if (!g.tenSwap) return;
-
-    const playerId = g.tenSwap.player;
-
-    const oppId =
-      g.order.find(id => id !== playerId);
-
-    const p1 = g.players[playerId];
-    const p2 = g.players[oppId];
-
-    const i1 =
-      p1.hand.indexOf(g.tenSwap.ownCard);
-
-    const i2 =
-      p2.hand.indexOf(oppCard);
-
-    if (i1 === -1 || i2 === -1) return;
-
-    const temp = p1.hand[i1];
-
-    p1.hand[i1] = p2.hand[i2];
-    p2.hand[i2] = temp;
-
-    g.tenSwap = null;
-
-    /* END TURN */
-    g.turn =
-      (g.turn + 1) % g.order.length;
-
-    io.to(roomId(socket)).emit("state", g);
-  });
+  /* NORMAL SWAP */
+  if (
+    e.target.dataset.card &&
+    me()?.pending
+  ){
+    socket.emit(
+      "swap",
+      e.target.dataset.card
+    );
+  }
 
   /* GHOULIES */
-  socket.on("callGhoulies", () => {
+  if (e.target.id === "ghouliesBtn"){
+    socket.emit("callGhoulies");
+  }
 
-    const g = getRoom(socket);
+  /* RESTART */
+  if (e.target.id === "restartBtn"){
+    socket.emit("restart", "room1");
+  }
+});
 
-    if (!g) return;
+/* SNAP */
+document.addEventListener("dblclick", e => {
 
-    g.turn =
-      (g.turn + 1) % g.order.length;
+  if (!memoryDone) return;
 
-    io.to(roomId(socket)).emit("state", g);
-  });
+  const c =
+    e.target.dataset.card;
 
+  if (c){
+    socket.emit("snap", c);
+  }
 });
