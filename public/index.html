@@ -17,31 +17,50 @@ body{
 #status{
   padding:10px;
   font-size:20px;
+  font-weight:bold;
 }
 
 #scores{
   margin-bottom:10px;
 }
 
+/* ROWS */
 .row{
   display:flex;
   justify-content:center;
+  align-items:center;
   gap:18px;
   flex-wrap:wrap;
   margin:16px;
 }
 
+/* HANDS */
+#hand,
+#opponentHand{
+  display:flex;              /* 🔥 FIX */
+  justify-content:center;   /* 🔥 FIX */
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px;
+  min-height:120px;
+  width:100%;
+  padding:10px;
+}
+
+/* CARDS */
 .card{
   width:70px;
-  margin:4px;
   transition:0.2s;
+  cursor:pointer;
 }
 
 .card:hover{
   transform:scale(1.08);
 }
 
-#deck,#discard{
+/* DECKS */
+#deck,
+#discard{
   width:85px;
   height:110px;
   border:2px solid white;
@@ -50,28 +69,38 @@ body{
   justify-content:center;
   background:#222;
   cursor:pointer;
+  border-radius:8px;
 }
 
-#hand,#opponentHand{
-  min-height:110px;
-  padding:10px;
+/* BUTTONS */
+button{
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:16px;
 }
 
 #restartBtn{
   display:none;
-  padding:10px;
-  margin:10px;
 }
 
+/* MOBILE */
 @media(max-width:600px){
 
   .card{
     width:55px;
   }
 
-  #deck,#discard{
+  #deck,
+  #discard{
     width:70px;
     height:95px;
+  }
+
+  #hand,
+  #opponentHand{
+    gap:6px;
   }
 }
 
@@ -89,26 +118,26 @@ body{
 </button>
 
 <!-- OPPONENT -->
-<div class="row">
-  <div id="opponentHand"></div>
-</div>
+<div id="opponentHand"></div>
 
 <!-- CENTER -->
 <div class="row">
+
   <div id="deck">
     Deck
   </div>
 
   <div id="discard"></div>
+
 </div>
 
 <!-- PLAYER -->
-<div class="row">
-  <div id="hand"></div>
-</div>
+<div id="hand"></div>
 
+<!-- PENDING -->
 <div id="pending"></div>
 
+<!-- ACTIONS -->
 <div class="row">
   <button id="ghouliesBtn">
     Call Ghoulies
