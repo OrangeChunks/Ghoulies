@@ -5,10 +5,23 @@
 <title>Ghoulies</title>
 
 <style>
-body{margin:0;background:#111;color:white;text-align:center;font-family:Arial}
 
-#status{padding:10px;font-size:20px}
-#scores{margin-bottom:10px}
+body{
+  margin:0;
+  background:#111;
+  color:white;
+  text-align:center;
+  font-family:Arial;
+}
+
+#status{
+  padding:10px;
+  font-size:20px;
+}
+
+#scores{
+  margin-bottom:10px;
+}
 
 .row{
   display:flex;
@@ -24,10 +37,13 @@ body{margin:0;background:#111;color:white;text-align:center;font-family:Arial}
   transition:0.2s;
 }
 
-.card:hover{transform:scale(1.1)}
+.card:hover{
+  transform:scale(1.08);
+}
 
 #deck,#discard{
-  width:85px;height:110px;
+  width:85px;
+  height:110px;
   border:2px solid white;
   display:flex;
   align-items:center;
@@ -37,7 +53,7 @@ body{margin:0;background:#111;color:white;text-align:center;font-family:Arial}
 }
 
 #hand,#opponentHand{
-  min-height:100px;
+  min-height:110px;
   padding:10px;
 }
 
@@ -48,33 +64,55 @@ body{margin:0;background:#111;color:white;text-align:center;font-family:Arial}
 }
 
 @media(max-width:600px){
-  .card{width:55px}
+
+  .card{
+    width:55px;
+  }
+
+  #deck,#discard{
+    width:70px;
+    height:95px;
+  }
 }
+
 </style>
 </head>
 
 <body>
 
 <div id="status"></div>
+
 <div id="scores"></div>
 
-<button id="restartBtn">Play Again</button>
+<button id="restartBtn">
+  Play Again
+</button>
 
+<!-- OPPONENT -->
 <div class="row">
   <div id="opponentHand"></div>
 </div>
 
+<!-- CENTER -->
 <div class="row">
-  <div id="deck">Deck</div>
-  <div id="discard">Discard</div>
+  <div id="deck">
+    Deck
+  </div>
+
+  <div id="discard"></div>
 </div>
 
+<!-- PLAYER -->
 <div class="row">
   <div id="hand"></div>
 </div>
 
+<div id="pending"></div>
+
 <div class="row">
-  <button id="ghouliesBtn">Call Ghoulies</button>
+  <button id="ghouliesBtn">
+    Call Ghoulies
+  </button>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
