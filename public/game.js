@@ -62,7 +62,6 @@ function back(){
   return "/cards/back.png";
 }
 
-/* DECK CLICK FIX */
 function clickedDeck(el){
   return el.id === "deck" || el.closest("#deck");
 }
@@ -118,16 +117,17 @@ function render(){
       const visible =
         revealed.includes(i);
 
-      const tenGlow =
+      const glow =
         state.tenSwap &&
         state.tenSwap.player === myId &&
         state.tenSwap.selectingOwn;
 
       return `
         <img
-          class="card ${tenGlow ? "tenGlow" : ""}"
+          class="card ${glow ? "tenGlow" : ""}"
           data-card="${c}"
           data-index="${i}"
+          data-handindex="${i}"
           src="${visible ? file(c) : back()}"
         >
       `;
@@ -137,15 +137,14 @@ function render(){
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
-      const tenGlow =
+      const glow =
         state.tenSwap &&
         state.tenSwap.player === myId &&
         !state.tenSwap.selectingOwn;
 
       return `
         <img
-          class="card ${tenGlow ? "tenGlow" : ""}"
-          data-opp="${c}"
+          class="card ${glow ? "tenGlow" : ""}"
           data-oppindex="${i}"
           src="${back()}"
         >
@@ -181,6 +180,15 @@ function render(){
         </div>
       `
       : "";
+
+  /* NO SWAP BUTTON */
+  document.getElementById("noSwapBtn").style.display =
+    (
+      state.tenSwap &&
+      state.tenSwap.player === myId
+    )
+      ? "inline-block"
+      : "none";
 
   /* RESTART */
   document.getElementById("restartBtn").style.display =
@@ -225,34 +233,42 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 OWN CARD */
+  /* 🔥 10 PICK OWN */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
     state.tenSwap.selectingOwn &&
-    e.target.dataset.card
+    e.target.dataset.handindex
   ){
 
     socket.emit(
       "tenOwn",
-      e.target.dataset.card
+      Number(e.target.dataset.handindex)
     );
 
     return;
   }
 
-  /* 🔥 10 OPP CARD */
+  /* 🔥 10 PICK OPP */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
     !state.tenSwap.selectingOwn &&
-    e.target.dataset.opp
+    e.target.dataset.oppindex
   ){
 
     socket.emit(
       "tenOpp",
-      e.target.dataset.opp
+      Number(e.target.dataset.oppindex)
     );
+
+    return;
+  }
+
+  /* NO SWAP */
+  if (e.target.id === "noSwapBtn"){
+
+    socket.emit("noSwap");
 
     return;
   }
@@ -262,25 +278,21 @@ document.addEventListener("click", e => {
 
     socket.emit("draw");
 
-    const deck =
-      document.querySelector("#deck img");
-
-    if (deck){
-
-      deck.classList.add("flip");
-
-      setTimeout(() => {
-        deck.classList.remove("flip");
-      }, 600);
-    }
-
     return;
   }
 
-  /* TAKE DISCARD */
+  /* DISCARD CLICK */
   if (e.target.closest("#discard")){
 
-    socket.emit("takeDiscard");
+    /* discard picked-up card */
+    if (me()?.pending){
+
+      socket.emit("discardPending");
+
+    } else {
+
+      socket.emit("takeDiscard");
+    }
 
     return;
   }
