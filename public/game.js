@@ -3,11 +3,9 @@ let socket = io();
 let state = null;
 let myId = null;
 
-/* MEMORY SYSTEM */
+/* MEMORY PHASE */
 let revealed = [];
 let memoryDone = false;
-let memoryStarted = false;
-let memoryLock = false; // 🔥 NEW: prevents reset loop
 
 socket.emit("join", "room1");
 
@@ -16,29 +14,6 @@ socket.on("you", id => {
 });
 
 socket.on("state", g => {
-
-  /* ---------------------------
-     FIX 1: ONLY RESET MEMORY
-     ON TRUE NEW ROUND, NOT ANY UPDATE
-  ---------------------------- */
-
-  const oldHand =
-    JSON.stringify(state?.players?.[myId]?.hand || []);
-
-  const newHand =
-    JSON.stringify(g?.players?.[myId]?.hand || []);
-
-  const roundChanged =
-    oldHand !== newHand &&
-    oldHand !== "[]";
-
-  if (roundChanged && !memoryLock){
-
-    revealed = [];
-    memoryDone = false;
-    memoryStarted = false;
-  }
-
   state = g;
   render();
 });
@@ -87,29 +62,9 @@ function back(){
   return "/cards/back.png";
 }
 
+/* DECK CLICK FIX */
 function clickedDeck(el){
   return el.id === "deck" || el.closest("#deck");
-}
-
-/* ---------------------------
-   FIX 2: PROPER MEMORY TIMER
----------------------------- */
-function startMemoryPhase(){
-
-  if (memoryStarted) return;
-
-  memoryStarted = true;
-  memoryLock = true;
-
-  setTimeout(() => {
-
-    revealed = [];
-    memoryDone = true;
-    memoryLock = false; // unlock after phase ends
-
-    render();
-
-  }, 5000);
 }
 
 /* MAIN RENDER */
@@ -163,17 +118,16 @@ function render(){
       const visible =
         revealed.includes(i);
 
-      const glow =
+      const tenGlow =
         state.tenSwap &&
         state.tenSwap.player === myId &&
         state.tenSwap.selectingOwn;
 
       return `
         <img
-          class="card ${glow ? "tenGlow" : ""}"
+          class="card ${tenGlow ? "tenGlow" : ""}"
           data-card="${c}"
           data-index="${i}"
-          data-handindex="${i}"
           src="${visible ? file(c) : back()}"
         >
       `;
@@ -183,14 +137,15 @@ function render(){
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
-      const glow =
+      const tenGlow =
         state.tenSwap &&
         state.tenSwap.player === myId &&
         !state.tenSwap.selectingOwn;
 
       return `
         <img
-          class="card ${glow ? "tenGlow" : ""}"
+          class="card ${tenGlow ? "tenGlow" : ""}"
+          data-opp="${c}"
           data-oppindex="${i}"
           src="${back()}"
         >
@@ -212,15 +167,26 @@ function render(){
     pending && turn
       ? `
         <div style="margin-top:10px">
-          <div style="margin-bottom:6px">You picked up:</div>
-          <img class="card flip" src="${file(pending)}" style="width:80px">
+
+          <div style="margin-bottom:6px">
+            You picked up:
+          </div>
+
+          <img
+            class="card flip"
+            src="${file(pending)}"
+            style="width:80px"
+          >
+
         </div>
       `
       : "";
 
   /* RESTART */
   document.getElementById("restartBtn").style.display =
-    state.gameOver ? "block" : "none";
+    state.gameOver
+      ? "block"
+      : "none";
 }
 
 /* CLICK EVENTS */
@@ -233,16 +199,25 @@ document.addEventListener("click", e => {
 
     if (e.target.dataset.index !== undefined){
 
-      const i = Number(e.target.dataset.index);
+      const i =
+        Number(e.target.dataset.index);
 
       if (!revealed.includes(i)){
 
         revealed.push(i);
+
         render();
 
         if (revealed.length === 2){
 
-          startMemoryPhase();
+          setTimeout(() => {
+
+            revealed = [];
+            memoryDone = true;
+
+            render();
+
+          }, 5000);
         }
       }
     }
@@ -250,63 +225,93 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 PICK OWN */
+  /* 🔥 10 OWN CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
     state.tenSwap.selectingOwn &&
-    e.target.dataset.handindex
+    e.target.dataset.card
   ){
 
-    socket.emit("tenOwn", Number(e.target.dataset.handindex));
+    socket.emit(
+      "tenOwn",
+      e.target.dataset.card
+    );
+
     return;
   }
 
-  /* 🔥 10 PICK OPP */
+  /* 🔥 10 OPP CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
     !state.tenSwap.selectingOwn &&
-    e.target.dataset.oppindex
+    e.target.dataset.opp
   ){
 
-    socket.emit("tenOpp", Number(e.target.dataset.oppindex));
+    socket.emit(
+      "tenOpp",
+      e.target.dataset.opp
+    );
+
     return;
   }
 
   /* DRAW */
   if (clickedDeck(e.target)){
+
     socket.emit("draw");
-    return;
-  }
 
-  /* DISCARD */
-  if (e.target.closest("#discard")){
+    const deck =
+      document.querySelector("#deck img");
 
-    if (me()?.pending){
-      socket.emit("discardPending");
-    } else {
-      socket.emit("takeDiscard");
+    if (deck){
+
+      deck.classList.add("flip");
+
+      setTimeout(() => {
+        deck.classList.remove("flip");
+      }, 600);
     }
 
     return;
   }
 
-  /* SWAP */
-  if (e.target.dataset.card && me()?.pending){
-    socket.emit("swap", e.target.dataset.card);
+  /* TAKE DISCARD */
+  if (e.target.closest("#discard")){
+
+    socket.emit("takeDiscard");
+
+    return;
+  }
+
+  /* NORMAL SWAP */
+  if (
+    e.target.dataset.card &&
+    me()?.pending
+  ){
+
+    socket.emit(
+      "swap",
+      e.target.dataset.card
+    );
+
     return;
   }
 
   /* GHOULIES */
   if (e.target.id === "ghouliesBtn"){
+
     socket.emit("callGhoulies");
+
     return;
   }
 
   /* RESTART */
   if (e.target.id === "restartBtn"){
+
     socket.emit("restart", "room1");
+
     return;
   }
 });
@@ -316,9 +321,11 @@ document.addEventListener("dblclick", e => {
 
   if (!memoryDone) return;
 
-  const c = e.target.dataset.card;
+  const c =
+    e.target.dataset.card;
 
   if (c){
+
     socket.emit("snap", c);
   }
 });
