@@ -1,305 +1,369 @@
-let socket = io();
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 
-let state = null;
-let myId = null;
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
-/* MEMORY PHASE */
-let revealed = [];
-let memoryDone = false;
+app.use(express.static("public"));
 
-socket.emit("join", "room1");
+const SUITS = ["♠","♥","♦","♣"];
+const VALUES = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 
-socket.on("you", id => {
-  myId = id;
-});
-
-socket.on("state", g => {
-  state = g;
-  render();
-});
-
-function me(){
-  return state.players?.[myId];
+function shuffle(a){
+  return a.sort(() => Math.random() - 0.5);
 }
 
-function oppId(){
-  return state.order?.find(id => id !== myId);
-}
+function createDeck(){
 
-/* CARD IMAGE */
-function file(card){
+  let d = [];
 
-  const v = card.slice(0,-1);
-  const s = card.slice(-1);
-
-  const suitMap = {
-    "♠":"s",
-    "♥":"h",
-    "♦":"d",
-    "♣":"c"
-  };
-
-  const valueMap = {
-    "A":"01",
-    "2":"02",
-    "3":"03",
-    "4":"04",
-    "5":"05",
-    "6":"06",
-    "7":"07",
-    "8":"08",
-    "9":"09",
-    "10":"10",
-    "J":"11",
-    "Q":"12",
-    "K":"13"
-  };
-
-  return `/cards/${suitMap[s]}${valueMap[v]}.png`;
-}
-
-function back(){
-  return "/cards/back.png";
-}
-
-/* NEW: DECK CLICK FIX */
-function clickedDeck(el){
-  return el.id === "deck" || el.closest("#deck");
-}
-
-/* MAIN RENDER */
-function render(){
-
-  if (!state || !myId) return;
-
-  const p = me();
-  const o = state.players?.[oppId()];
-
-  const turn =
-    state.order[state.turn] === myId;
-
-  /* STATUS */
-  if (!memoryDone){
-
-    document.getElementById("status").innerText =
-      `Choose 2 cards to memorise (${revealed.length}/2)`;
-
-  } else {
-
-    document.getElementById("status").innerText =
-      turn ? "Your turn" : "Their turn";
+  for (let s of SUITS){
+    for (let v of VALUES){
+      d.push(v + s);
+    }
   }
 
-  /* SCORES */
-  document.getElementById("scores").innerHTML =
-    `You: ${state.scores?.[myId] || 0}
-     | Opponent: ${state.scores?.[oppId()] || 0}`;
-
-  /* YOUR HAND */
-  document.getElementById("hand").innerHTML =
-    p?.hand?.map((c,i) => {
-
-      const visible =
-        revealed.includes(i);
-
-      return `
-        <img
-          class="card"
-          data-card="${c}"
-          data-index="${i}"
-          src="${visible ? file(c) : back()}"
-        >
-      `;
-    }).join("") || "";
-
-  /* OPPONENT HAND */
-  document.getElementById("opponentHand").innerHTML =
-    o?.hand?.map((c,i) => {
-
-      return `
-        <img
-          class="card"
-          data-opp="${c}"
-          data-oppindex="${i}"
-          src="${back()}"
-        >
-      `;
-    }).join("") || "";
-
-  /* DISCARD */
-  const top = state.discard?.at(-1);
-
-  document.getElementById("discard").innerHTML =
-    top
-      ? `<img class="card" src="${file(top)}">`
-      : "";
-
-  /* PENDING */
-  const pending = p?.pending;
-
-  document.getElementById("pending").innerHTML =
-    pending && turn
-      ? `
-        <div style="margin-top:10px">
-
-          <div style="margin-bottom:6px">
-            You picked up:
-          </div>
-
-          <img
-            class="card flip"
-            src="${file(pending)}"
-            style="width:80px"
-          >
-
-        </div>
-      `
-      : "";
-
-  /* RESTART */
-  document.getElementById("restartBtn").style.display =
-    state.gameOver
-      ? "block"
-      : "none";
+  return shuffle(d);
 }
 
-/* CLICK EVENTS */
-document.addEventListener("click", e => {
+function calculate(hand){
 
-  if (!state) return;
+  return hand.reduce((t,c) => {
 
-  /* MEMORY PHASE */
-  if (!memoryDone){
+    const v = c.slice(0,-1);
 
-    if (e.target.dataset.index !== undefined){
+    if (v === "A") return t + 1;
+    if (["J","Q","K"].includes(v)) return t + 10;
 
-      const i =
-        Number(e.target.dataset.index);
+    return t + Number(v);
 
-      if (!revealed.includes(i)){
+  },0);
+}
 
-        revealed.push(i);
+function newGame(){
 
-        render();
+  const deck = createDeck();
 
-        if (revealed.length === 2){
+  return {
+    deck,
+    discard:[deck.pop()],
+    players:{},
+    order:[],
+    turn:0,
+    scores:{},
 
-          setTimeout(() => {
+    /* 10 mechanic */
+    tenSwap:null,
 
-            revealed = [];
-            memoryDone = true;
+    /* ghoulies */
+    ghouliesCaller:null,
+    finalTurn:false,
 
-            render();
+    gameOver:false
+  };
+}
 
-          }, 5000);
-        }
+const rooms = {};
+
+function getRoom(socket){
+
+  const room =
+    [...socket.rooms].find(r => r !== socket.id);
+
+  return rooms[room];
+}
+
+function roomId(socket){
+
+  return [...socket.rooms]
+    .find(r => r !== socket.id);
+}
+
+io.on("connection", socket => {
+
+  socket.on("join", room => {
+
+    if (!rooms[room]){
+      rooms[room] = newGame();
+    }
+
+    const g = rooms[room];
+
+    socket.join(room);
+
+    if (
+      !g.players[socket.id] &&
+      Object.keys(g.players).length < 2
+    ){
+
+      g.players[socket.id] = {
+        hand:g.deck.splice(0,5),
+        pending:null
+      };
+
+      g.order.push(socket.id);
+
+      g.scores[socket.id] =
+        g.scores[socket.id] || 0;
+    }
+
+    socket.emit("you", socket.id);
+
+    io.to(room).emit("state", g);
+  });
+
+  function isTurn(g,id){
+    return g.order[g.turn] === id;
+  }
+
+  /* DRAW */
+  socket.on("draw", () => {
+
+    const g = getRoom(socket);
+
+    if (!g) return;
+    if (!isTurn(g,socket.id)) return;
+
+    const p = g.players[socket.id];
+
+    if (p.pending) return;
+
+    p.pending = g.deck.pop();
+
+    io.to(roomId(socket)).emit("state", g);
+  });
+
+  /* TAKE DISCARD */
+  socket.on("takeDiscard", () => {
+
+    const g = getRoom(socket);
+
+    if (!g) return;
+    if (!isTurn(g,socket.id)) return;
+
+    const p = g.players[socket.id];
+
+    if (p.pending) return;
+    if (!g.discard.length) return;
+
+    p.pending = g.discard.pop();
+
+    io.to(roomId(socket)).emit("state", g);
+  });
+
+  /* SWAP */
+  socket.on("swap", card => {
+
+    const g = getRoom(socket);
+
+    if (!g) return;
+    if (!isTurn(g,socket.id)) return;
+
+    const p = g.players[socket.id];
+
+    if (!p.pending) return;
+
+    const i = p.hand.indexOf(card);
+
+    if (i === -1) return;
+
+    const discarded = p.hand[i];
+
+    p.hand[i] = p.pending;
+
+    p.pending = null;
+
+    g.discard.push(discarded);
+
+    /* 🔥 10 RULE */
+    if (discarded.startsWith("10")){
+
+      g.tenSwap = {
+        player:socket.id,
+        selectingOwn:true,
+        ownCard:null
+      };
+
+      io.to(roomId(socket)).emit("state", g);
+      return;
+    }
+
+    /* ghoulies final turn */
+    if (g.finalTurn){
+
+      finishRound(g);
+
+    } else {
+
+      nextTurn(g);
+    }
+
+    io.to(roomId(socket)).emit("state", g);
+  });
+
+  /* 🔥 10 OWN CARD */
+  socket.on("tenOwn", card => {
+
+    const g = getRoom(socket);
+
+    if (!g?.tenSwap) return;
+
+    if (g.tenSwap.player !== socket.id) return;
+
+    g.tenSwap.ownCard = card;
+    g.tenSwap.selectingOwn = false;
+
+    io.to(roomId(socket)).emit("state", g);
+  });
+
+  /* 🔥 10 OPP CARD */
+  socket.on("tenOpp", oppCard => {
+
+    const g = getRoom(socket);
+
+    if (!g?.tenSwap) return;
+
+    const playerId = g.tenSwap.player;
+
+    if (playerId !== socket.id) return;
+
+    const oppId =
+      g.order.find(id => id !== playerId);
+
+    const p1 = g.players[playerId];
+    const p2 = g.players[oppId];
+
+    const i1 =
+      p1.hand.indexOf(g.tenSwap.ownCard);
+
+    const i2 =
+      p2.hand.indexOf(oppCard);
+
+    if (i1 === -1 || i2 === -1) return;
+
+    const temp = p1.hand[i1];
+
+    p1.hand[i1] = p2.hand[i2];
+    p2.hand[i2] = temp;
+
+    g.tenSwap = null;
+
+    /* final ghoulies turn */
+    if (g.finalTurn){
+
+      finishRound(g);
+
+    } else {
+
+      nextTurn(g);
+    }
+
+    io.to(roomId(socket)).emit("state", g);
+  });
+
+  /* SNAP */
+  socket.on("snap", card => {
+
+    const g = getRoom(socket);
+
+    if (!g) return;
+
+    const p = g.players[socket.id];
+
+    const top = g.discard.at(-1);
+
+    if (!top) return;
+
+    if (
+      top.slice(0,-1) ===
+      card.slice(0,-1)
+    ){
+
+      p.hand =
+        p.hand.filter(c => c !== card);
+
+      g.discard.push(card);
+    }
+
+    io.to(roomId(socket)).emit("state", g);
+  });
+
+  /* 🔥 FIXED GHOULIES */
+  socket.on("callGhoulies", () => {
+
+    const g = getRoom(socket);
+
+    if (!g) return;
+
+    if (g.ghouliesCaller) return;
+
+    g.ghouliesCaller = socket.id;
+
+    g.finalTurn = true;
+
+    /* move to OTHER player */
+    g.turn =
+      (g.turn + 1) % g.order.length;
+
+    io.to(roomId(socket)).emit("state", g);
+  });
+
+  function nextTurn(g){
+
+    g.turn =
+      (g.turn + 1) % g.order.length;
+  }
+
+  function finishRound(g){
+
+    for (let id of g.order){
+
+      const p = g.players[id];
+
+      g.scores[id] += calculate(p.hand);
+
+      if (g.scores[id] >= 51){
+        g.gameOver = true;
       }
     }
 
-    return;
-  }
+    if (!g.gameOver){
 
-  /* 🔥 10 STEP 1 */
-  if (
-    state.tenSwap &&
-    state.tenSwap.player === myId &&
-    state.tenSwap.step === 1 &&
-    e.target.dataset.card
-  ){
+      const deck = createDeck();
 
-    socket.emit(
-      "tenOwn",
-      e.target.dataset.card
-    );
+      g.deck = deck;
 
-    return;
-  }
+      g.discard = [deck.pop()];
 
-  /* 🔥 10 STEP 2 */
-  if (
-    state.tenSwap &&
-    state.tenSwap.player === myId &&
-    state.tenSwap.step === 2 &&
-    e.target.dataset.opp
-  ){
+      for (let id of g.order){
 
-    socket.emit(
-      "tenOpp",
-      e.target.dataset.opp
-    );
+        g.players[id] = {
+          hand:deck.splice(0,5),
+          pending:null
+        };
+      }
 
-    return;
-  }
+      g.turn = 0;
 
-  /* NEW: DECK FIX + ANIMATION */
-  if (clickedDeck(e.target)){
+      g.tenSwap = null;
 
-    socket.emit("draw");
-
-    const deck =
-      document.querySelector("#deck img");
-
-    if (deck){
-
-      deck.classList.add("flip");
-
-      setTimeout(() => {
-        deck.classList.remove("flip");
-      }, 600);
+      g.ghouliesCaller = null;
+      g.finalTurn = false;
     }
-
-    return;
-  }
-
-  /* TAKE DISCARD */
-  if (e.target.closest("#discard")){
-
-    socket.emit("takeDiscard");
-
-    return;
-  }
-
-  /* NORMAL SWAP */
-  if (
-    e.target.dataset.card &&
-    me()?.pending
-  ){
-
-    socket.emit(
-      "swap",
-      e.target.dataset.card
-    );
-
-    return;
-  }
-
-  /* GHOULIES */
-  if (e.target.id === "ghouliesBtn"){
-
-    socket.emit("callGhoulies");
-
-    return;
   }
 
   /* RESTART */
-  if (e.target.id === "restartBtn"){
+  socket.on("restart", room => {
 
-    socket.emit("restart", "room1");
+    rooms[room] = newGame();
 
-    return;
-  }
+    io.to(room).emit("state", rooms[room]);
+  });
 });
 
-/* SNAP */
-document.addEventListener("dblclick", e => {
-
-  if (!memoryDone) return;
-
-  const c =
-    e.target.dataset.card;
-
-  if (c){
-
-    socket.emit("snap", c);
-  }
-});
+server.listen(
+  process.env.PORT || 3000,
+  () => console.log("Server running")
+);
