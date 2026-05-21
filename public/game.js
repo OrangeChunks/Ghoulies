@@ -62,6 +62,11 @@ function back(){
   return "/cards/back.png";
 }
 
+/* NEW: DECK CLICK FIX */
+function clickedDeck(el){
+  return el.id === "deck" || el.closest("#deck");
+}
+
 /* MAIN RENDER */
 function render(){
 
@@ -133,15 +138,20 @@ function render(){
   const pending = p?.pending;
 
   document.getElementById("pending").innerHTML =
-    pending
+    pending && turn
       ? `
         <div style="margin-top:10px">
-          You picked up:<br>
+
+          <div style="margin-bottom:6px">
+            You picked up:
+          </div>
+
           <img
-            class="card"
+            class="card flip"
             src="${file(pending)}"
             style="width:80px"
           >
+
         </div>
       `
       : "";
@@ -221,14 +231,32 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* DRAW */
-  if (e.target.id === "deck"){
+  /* NEW: DECK FIX + ANIMATION */
+  if (clickedDeck(e.target)){
+
     socket.emit("draw");
+
+    const deck =
+      document.querySelector("#deck img");
+
+    if (deck){
+
+      deck.classList.add("flip");
+
+      setTimeout(() => {
+        deck.classList.remove("flip");
+      }, 600);
+    }
+
+    return;
   }
 
   /* TAKE DISCARD */
   if (e.target.closest("#discard")){
+
     socket.emit("takeDiscard");
+
+    return;
   }
 
   /* NORMAL SWAP */
@@ -236,20 +264,29 @@ document.addEventListener("click", e => {
     e.target.dataset.card &&
     me()?.pending
   ){
+
     socket.emit(
       "swap",
       e.target.dataset.card
     );
+
+    return;
   }
 
   /* GHOULIES */
   if (e.target.id === "ghouliesBtn"){
+
     socket.emit("callGhoulies");
+
+    return;
   }
 
   /* RESTART */
   if (e.target.id === "restartBtn"){
+
     socket.emit("restart", "room1");
+
+    return;
   }
 });
 
@@ -262,6 +299,7 @@ document.addEventListener("dblclick", e => {
     e.target.dataset.card;
 
   if (c){
+
     socket.emit("snap", c);
   }
 });
