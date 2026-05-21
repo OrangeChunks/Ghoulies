@@ -62,7 +62,7 @@ function back(){
   return "/cards/back.png";
 }
 
-/* NEW: DECK CLICK FIX */
+/* DECK CLICK FIX */
 function clickedDeck(el){
   return el.id === "deck" || el.closest("#deck");
 }
@@ -84,6 +84,22 @@ function render(){
     document.getElementById("status").innerText =
       `Choose 2 cards to memorise (${revealed.length}/2)`;
 
+  } else if (
+    state.tenSwap &&
+    state.tenSwap.player === myId
+  ){
+
+    if (state.tenSwap.selectingOwn){
+
+      document.getElementById("status").innerText =
+        "Choose one of YOUR cards to swap";
+
+    } else {
+
+      document.getElementById("status").innerText =
+        "Choose an OPPONENT card to swap";
+    }
+
   } else {
 
     document.getElementById("status").innerText =
@@ -102,9 +118,14 @@ function render(){
       const visible =
         revealed.includes(i);
 
+      const tenGlow =
+        state.tenSwap &&
+        state.tenSwap.player === myId &&
+        state.tenSwap.selectingOwn;
+
       return `
         <img
-          class="card"
+          class="card ${tenGlow ? "tenGlow" : ""}"
           data-card="${c}"
           data-index="${i}"
           src="${visible ? file(c) : back()}"
@@ -116,9 +137,14 @@ function render(){
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
+      const tenGlow =
+        state.tenSwap &&
+        state.tenSwap.player === myId &&
+        !state.tenSwap.selectingOwn;
+
       return `
         <img
-          class="card"
+          class="card ${tenGlow ? "tenGlow" : ""}"
           data-opp="${c}"
           data-oppindex="${i}"
           src="${back()}"
@@ -199,11 +225,11 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 STEP 1 */
+  /* 🔥 10 OWN CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
-    state.tenSwap.step === 1 &&
+    state.tenSwap.selectingOwn &&
     e.target.dataset.card
   ){
 
@@ -215,11 +241,11 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 STEP 2 */
+  /* 🔥 10 OPP CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
-    state.tenSwap.step === 2 &&
+    !state.tenSwap.selectingOwn &&
     e.target.dataset.opp
   ){
 
@@ -231,7 +257,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* NEW: DECK FIX + ANIMATION */
+  /* DRAW */
   if (clickedDeck(e.target)){
 
     socket.emit("draw");
