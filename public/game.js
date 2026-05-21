@@ -6,6 +6,7 @@ let myId = null;
 /* MEMORY PHASE */
 let revealed = [];
 let memoryDone = false;
+let memoryLock = false;
 
 socket.emit("join", "room1");
 
@@ -181,7 +182,7 @@ function render(){
       `
       : "";
 
-  /* NO SWAP BUTTON */
+  /* NO SWAP */
   document.getElementById("noSwapBtn").style.display =
     (
       state.tenSwap &&
@@ -205,6 +206,8 @@ document.addEventListener("click", e => {
   /* MEMORY PHASE */
   if (!memoryDone){
 
+    if (memoryLock) return;
+
     if (e.target.dataset.index !== undefined){
 
       const i =
@@ -218,10 +221,13 @@ document.addEventListener("click", e => {
 
         if (revealed.length === 2){
 
+          memoryLock = true;
+
           setTimeout(() => {
 
             revealed = [];
             memoryDone = true;
+            memoryLock = false;
 
             render();
 
@@ -281,10 +287,9 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* DISCARD CLICK */
+  /* DISCARD */
   if (e.target.closest("#discard")){
 
-    /* discard picked-up card */
     if (me()?.pending){
 
       socket.emit("discardPending");
