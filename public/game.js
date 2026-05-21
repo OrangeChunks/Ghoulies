@@ -3,10 +3,10 @@ let socket = io();
 let state = null;
 let myId = null;
 
-/* MEMORY PHASE */
+/* MEMORY */
 let revealed = [];
 let memoryDone = false;
-let memoryLock = false;
+let memoryTimerStarted = false;
 
 socket.emit("join", "room1");
 
@@ -15,7 +15,27 @@ socket.on("you", id => {
 });
 
 socket.on("state", g => {
+
+  const oldHand =
+    JSON.stringify(
+      state?.players?.[myId]?.hand || []
+    );
+
+  const newHand =
+    JSON.stringify(
+      g?.players?.[myId]?.hand || []
+    );
+
+  /* NEW ROUND RESET */
+  if (oldHand !== newHand){
+
+    revealed = [];
+    memoryDone = false;
+    memoryTimerStarted = false;
+  }
+
   state = g;
+
   render();
 });
 
@@ -67,7 +87,7 @@ function clickedDeck(el){
   return el.id === "deck" || el.closest("#deck");
 }
 
-/* MAIN RENDER */
+/* RENDER */
 function render(){
 
   if (!state || !myId) return;
@@ -134,7 +154,7 @@ function render(){
       `;
     }).join("") || "";
 
-  /* OPPONENT HAND */
+  /* OPPONENT */
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
@@ -206,8 +226,6 @@ document.addEventListener("click", e => {
   /* MEMORY PHASE */
   if (!memoryDone){
 
-    if (memoryLock) return;
-
     if (e.target.dataset.index !== undefined){
 
       const i =
@@ -219,15 +237,19 @@ document.addEventListener("click", e => {
 
         render();
 
-        if (revealed.length === 2){
+        /* START TIMER */
+        if (
+          revealed.length === 2 &&
+          !memoryTimerStarted
+        ){
 
-          memoryLock = true;
+          memoryTimerStarted = true;
 
           setTimeout(() => {
 
             revealed = [];
+
             memoryDone = true;
-            memoryLock = false;
 
             render();
 
@@ -239,7 +261,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 PICK OWN */
+  /* 10 OWN */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -255,7 +277,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 PICK OPP */
+  /* 10 OPP */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
