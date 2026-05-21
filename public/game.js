@@ -3,10 +3,10 @@ let socket = io();
 let state = null;
 let myId = null;
 
-/* MEMORY PHASE */
+/* MEMORY */
 let revealed = [];
 let memoryDone = false;
-let memoryLocked = false;
+let memoryTimer = null;
 
 socket.emit("join", "room1");
 
@@ -65,6 +65,26 @@ function back(){
 
 function clickedDeck(el){
   return el.id === "deck" || el.closest("#deck");
+}
+
+/* MEMORY TIMER */
+function startMemoryTimer(){
+
+  if (memoryTimer) return;
+
+  memoryTimer = setTimeout(() => {
+
+    revealed = [];
+
+    memoryDone = true;
+
+    clearTimeout(memoryTimer);
+
+    memoryTimer = null;
+
+    render();
+
+  }, 5000);
 }
 
 /* MAIN RENDER */
@@ -206,8 +226,6 @@ document.addEventListener("click", e => {
   /* MEMORY PHASE */
   if (!memoryDone){
 
-    if (memoryLocked) return;
-
     if (e.target.dataset.index !== undefined){
 
       const i =
@@ -219,19 +237,9 @@ document.addEventListener("click", e => {
 
         render();
 
-        if (revealed.length >= 2){
+        if (revealed.length === 2){
 
-          memoryLocked = true;
-
-          setTimeout(() => {
-
-            revealed = [];
-            memoryDone = true;
-            memoryLocked = false;
-
-            render();
-
-          }, 5000);
+          startMemoryTimer();
         }
       }
     }
@@ -239,7 +247,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 PICK OWN */
+  /* 10 PICK OWN */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -255,7 +263,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 PICK OPP */
+  /* 10 PICK OPP */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -338,8 +346,7 @@ document.addEventListener("dblclick", e => {
 
   if (!memoryDone) return;
 
-  const c =
-    e.target.dataset.card;
+  const c = e.target.dataset.card;
 
   if (c){
 
