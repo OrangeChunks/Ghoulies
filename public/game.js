@@ -3,10 +3,8 @@ let socket = io();
 let state = null;
 let myId = null;
 
-/* MEMORY SYSTEM */
 let revealed = [];
 let memoryDone = false;
-let memoryStarted = false;
 
 socket.emit("join", "room1");
 
@@ -15,30 +13,7 @@ socket.on("you", id => {
 });
 
 socket.on("state", g => {
-
-  /* detect new round */
-  const oldHand =
-    JSON.stringify(
-      state?.players?.[myId]?.hand || []
-    );
-
-  const newHand =
-    JSON.stringify(
-      g?.players?.[myId]?.hand || []
-    );
-
-  if (
-    oldHand !== newHand &&
-    oldHand !== "[]"
-  ){
-
-    revealed = [];
-    memoryDone = false;
-    memoryStarted = false;
-  }
-
   state = g;
-
   render();
 });
 
@@ -50,33 +25,15 @@ function oppId(){
   return state.order?.find(id => id !== myId);
 }
 
-/* CARD IMAGE */
 function file(card){
-
   const v = card.slice(0,-1);
   const s = card.slice(-1);
 
-  const suitMap = {
-    "♠":"s",
-    "♥":"h",
-    "♦":"d",
-    "♣":"c"
-  };
-
+  const suitMap = {"♠":"s","♥":"h","♦":"d","♣":"c"};
   const valueMap = {
-    "A":"01",
-    "2":"02",
-    "3":"03",
-    "4":"04",
-    "5":"05",
-    "6":"06",
-    "7":"07",
-    "8":"08",
-    "9":"09",
-    "10":"10",
-    "J":"11",
-    "Q":"12",
-    "K":"13"
+    "A":"01","2":"02","3":"03","4":"04","5":"05",
+    "6":"06","7":"07","8":"08","9":"09","10":"10",
+    "J":"11","Q":"12","K":"13"
   };
 
   return `/cards/${suitMap[s]}${valueMap[v]}.png`;
@@ -86,297 +43,75 @@ function back(){
   return "/cards/back.png";
 }
 
-function clickedDeck(el){
-  return el.id === "deck" || el.closest("#deck");
-}
-
-/* START MEMORY TIMER */
-function startMemoryPhase(){
-
-  if (memoryStarted) return;
-
-  memoryStarted = true;
-
-  setTimeout(() => {
-
-    revealed = [];
-
-    memoryDone = true;
-
-    render();
-
-  }, 5000);
-}
-
-/* MAIN RENDER */
-function render(){
-
-  if (!state || !myId) return;
-
-  const p = me();
-  const o = state.players?.[oppId()];
-
-  const turn =
-    state.order[state.turn] === myId;
-
-  /* STATUS */
-  if (!memoryDone){
-
-    document.getElementById("status").innerText =
-      `Choose 2 cards to memorise (${revealed.length}/2)`;
-
-  } else if (
-    state.tenSwap &&
-    state.tenSwap.player === myId
-  ){
-
-    if (state.tenSwap.selectingOwn){
-
-      document.getElementById("status").innerText =
-        "Choose one of YOUR cards to swap";
-
-    } else {
-
-      document.getElementById("status").innerText =
-        "Choose an OPPONENT card to swap";
-    }
-
-  } else {
-
-    document.getElementById("status").innerText =
-      turn ? "Your turn" : "Their turn";
-  }
-
-  /* SCORES */
-  document.getElementById("scores").innerHTML =
-    `You: ${state.scores?.[myId] || 0}
-     | Opponent: ${state.scores?.[oppId()] || 0}`;
-
-  /* YOUR HAND */
-  document.getElementById("hand").innerHTML =
-    p?.hand?.map((c,i) => {
-
-      const visible =
-        revealed.includes(i);
-
-      const glow =
-        state.tenSwap &&
-        state.tenSwap.player === myId &&
-        state.tenSwap.selectingOwn;
-
-      return `
-        <img
-          class="card ${glow ? "tenGlow" : ""}"
-          data-card="${c}"
-          data-index="${i}"
-          data-handindex="${i}"
-          src="${visible ? file(c) : back()}"
-        >
-      `;
-    }).join("") || "";
-
-  /* OPPONENT HAND */
-  document.getElementById("opponentHand").innerHTML =
-    o?.hand?.map((c,i) => {
-
-      const glow =
-        state.tenSwap &&
-        state.tenSwap.player === myId &&
-        !state.tenSwap.selectingOwn;
-
-      return `
-        <img
-          class="card ${glow ? "tenGlow" : ""}"
-          data-oppindex="${i}"
-          src="${back()}"
-        >
-      `;
-    }).join("") || "";
-
-  /* DISCARD */
-  const top = state.discard?.at(-1);
-
-  document.getElementById("discard").innerHTML =
-    top
-      ? `<img class="card" src="${file(top)}">`
-      : "";
-
-  /* PENDING */
-  const pending = p?.pending;
-
-  document.getElementById("pending").innerHTML =
-    pending && turn
-      ? `
-        <div style="margin-top:10px">
-
-          <div style="margin-bottom:6px">
-            You picked up:
-          </div>
-
-          <img
-            class="card flip"
-            src="${file(pending)}"
-            style="width:80px"
-          >
-
-        </div>
-      `
-      : "";
-
-  /* NO SWAP */
-  document.getElementById("noSwapBtn").style.display =
-    (
-      state.tenSwap &&
-      state.tenSwap.player === myId
-    )
-      ? "inline-block"
-      : "none";
-
-  /* RESTART */
-  document.getElementById("restartBtn").style.display =
-    state.gameOver
-      ? "block"
-      : "none";
-}
-
-/* CLICK EVENTS */
+/* MEMORY CLICK */
 document.addEventListener("click", e => {
 
   if (!state) return;
 
-  /* MEMORY PHASE */
-  if (!memoryDone){
+  if (state.memoryPhase){
 
     if (e.target.dataset.index !== undefined){
 
-      /* STOP AFTER 2 */
-      if (revealed.length >= 2){
-        return;
-      }
-
-      const i =
-        Number(e.target.dataset.index);
+      const i = Number(e.target.dataset.index);
 
       if (!revealed.includes(i)){
-
         revealed.push(i);
-
         render();
 
         if (revealed.length === 2){
-
-          startMemoryPhase();
+          setTimeout(() => {
+            socket.emit("memoryDone");
+            memoryDone = true;
+            revealed = [];
+          }, 3000);
         }
       }
     }
-
-    return;
-  }
-
-  /* 10 PICK OWN */
-  if (
-    state.tenSwap &&
-    state.tenSwap.player === myId &&
-    state.tenSwap.selectingOwn &&
-    e.target.dataset.handindex
-  ){
-
-    socket.emit(
-      "tenOwn",
-      Number(e.target.dataset.handindex)
-    );
-
-    return;
-  }
-
-  /* 10 PICK OPP */
-  if (
-    state.tenSwap &&
-    state.tenSwap.player === myId &&
-    !state.tenSwap.selectingOwn &&
-    e.target.dataset.oppindex
-  ){
-
-    socket.emit(
-      "tenOpp",
-      Number(e.target.dataset.oppindex)
-    );
-
-    return;
-  }
-
-  /* NO SWAP */
-  if (e.target.id === "noSwapBtn"){
-
-    socket.emit("noSwap");
-
     return;
   }
 
   /* DRAW */
-  if (clickedDeck(e.target)){
-
+  if (e.target.id === "deck"){
     socket.emit("draw");
-
     return;
   }
 
   /* DISCARD */
   if (e.target.closest("#discard")){
-
-    if (me()?.pending){
-
-      socket.emit("discardPending");
-
-    } else {
-
-      socket.emit("takeDiscard");
-    }
-
+    socket.emit("takeDiscard");
     return;
   }
 
-  /* NORMAL SWAP */
-  if (
-    e.target.dataset.card &&
-    me()?.pending
-  ){
-
-    socket.emit(
-      "swap",
-      e.target.dataset.card
-    );
-
+  /* SWAP */
+  if (e.target.dataset.card && me()?.pending){
+    socket.emit("swap", e.target.dataset.card);
     return;
   }
 
-  /* GHOULIES */
   if (e.target.id === "ghouliesBtn"){
-
     socket.emit("callGhoulies");
-
-    return;
   }
 
-  /* RESTART */
-  if (e.target.id === "restartBtn"){
-
-    socket.emit("restart", "room1");
-
-    return;
-  }
 });
 
-/* SNAP */
-document.addEventListener("dblclick", e => {
+function render(){
 
-  if (!memoryDone) return;
+  if (!state || !myId) return;
 
-  const c =
-    e.target.dataset.card;
+  const p = me();
 
-  if (c){
+  document.getElementById("status").innerText =
+    state.memoryPhase
+      ? "Memorise 2 cards"
+      : "Play!";
 
-    socket.emit("snap", c);
-  }
-});
+  document.getElementById("hand").innerHTML =
+    p?.hand.map((c,i)=>`
+      <img class="card"
+        data-card="${c}"
+        data-index="${i}"
+        src="${state.memoryPhase ? file(c) : back()}"
+      >
+    `).join("");
+
+}
