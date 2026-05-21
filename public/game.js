@@ -3,10 +3,10 @@ let socket = io();
 let state = null;
 let myId = null;
 
-/* MEMORY */
+/* MEMORY PHASE */
 let revealed = [];
 let memoryDone = false;
-let memoryTimerStarted = false;
+let memoryLocked = false;
 
 socket.emit("join", "room1");
 
@@ -15,27 +15,7 @@ socket.on("you", id => {
 });
 
 socket.on("state", g => {
-
-  const oldHand =
-    JSON.stringify(
-      state?.players?.[myId]?.hand || []
-    );
-
-  const newHand =
-    JSON.stringify(
-      g?.players?.[myId]?.hand || []
-    );
-
-  /* NEW ROUND RESET */
-  if (oldHand !== newHand){
-
-    revealed = [];
-    memoryDone = false;
-    memoryTimerStarted = false;
-  }
-
   state = g;
-
   render();
 });
 
@@ -87,7 +67,7 @@ function clickedDeck(el){
   return el.id === "deck" || el.closest("#deck");
 }
 
-/* RENDER */
+/* MAIN RENDER */
 function render(){
 
   if (!state || !myId) return;
@@ -154,7 +134,7 @@ function render(){
       `;
     }).join("") || "";
 
-  /* OPPONENT */
+  /* OPPONENT HAND */
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
@@ -202,7 +182,7 @@ function render(){
       `
       : "";
 
-  /* NO SWAP */
+  /* NO SWAP BUTTON */
   document.getElementById("noSwapBtn").style.display =
     (
       state.tenSwap &&
@@ -226,6 +206,8 @@ document.addEventListener("click", e => {
   /* MEMORY PHASE */
   if (!memoryDone){
 
+    if (memoryLocked) return;
+
     if (e.target.dataset.index !== undefined){
 
       const i =
@@ -237,19 +219,15 @@ document.addEventListener("click", e => {
 
         render();
 
-        /* START TIMER */
-        if (
-          revealed.length === 2 &&
-          !memoryTimerStarted
-        ){
+        if (revealed.length >= 2){
 
-          memoryTimerStarted = true;
+          memoryLocked = true;
 
           setTimeout(() => {
 
             revealed = [];
-
             memoryDone = true;
+            memoryLocked = false;
 
             render();
 
@@ -261,7 +239,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 10 OWN */
+  /* 🔥 10 PICK OWN */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -277,7 +255,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 10 OPP */
+  /* 🔥 10 PICK OPP */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
