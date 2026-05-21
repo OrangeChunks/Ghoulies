@@ -3,10 +3,10 @@ let socket = io();
 let state = null;
 let myId = null;
 
-/* MEMORY */
+/* MEMORY SYSTEM */
 let revealed = [];
 let memoryDone = false;
-let memoryTimer = null;
+let memoryStarted = false;
 
 socket.emit("join", "room1");
 
@@ -15,7 +15,30 @@ socket.on("you", id => {
 });
 
 socket.on("state", g => {
+
+  /* detect new round */
+  const oldHand =
+    JSON.stringify(
+      state?.players?.[myId]?.hand || []
+    );
+
+  const newHand =
+    JSON.stringify(
+      g?.players?.[myId]?.hand || []
+    );
+
+  if (
+    oldHand !== newHand &&
+    oldHand !== "[]"
+  ){
+
+    revealed = [];
+    memoryDone = false;
+    memoryStarted = false;
+  }
+
   state = g;
+
   render();
 });
 
@@ -67,20 +90,18 @@ function clickedDeck(el){
   return el.id === "deck" || el.closest("#deck");
 }
 
-/* MEMORY TIMER */
-function startMemoryTimer(){
+/* START MEMORY TIMER */
+function startMemoryPhase(){
 
-  if (memoryTimer) return;
+  if (memoryStarted) return;
 
-  memoryTimer = setTimeout(() => {
+  memoryStarted = true;
+
+  setTimeout(() => {
 
     revealed = [];
 
     memoryDone = true;
-
-    clearTimeout(memoryTimer);
-
-    memoryTimer = null;
 
     render();
 
@@ -202,7 +223,7 @@ function render(){
       `
       : "";
 
-  /* NO SWAP BUTTON */
+  /* NO SWAP */
   document.getElementById("noSwapBtn").style.display =
     (
       state.tenSwap &&
@@ -228,6 +249,11 @@ document.addEventListener("click", e => {
 
     if (e.target.dataset.index !== undefined){
 
+      /* STOP AFTER 2 */
+      if (revealed.length >= 2){
+        return;
+      }
+
       const i =
         Number(e.target.dataset.index);
 
@@ -239,7 +265,7 @@ document.addEventListener("click", e => {
 
         if (revealed.length === 2){
 
-          startMemoryTimer();
+          startMemoryPhase();
         }
       }
     }
@@ -346,7 +372,8 @@ document.addEventListener("dblclick", e => {
 
   if (!memoryDone) return;
 
-  const c = e.target.dataset.card;
+  const c =
+    e.target.dataset.card;
 
   if (c){
 
