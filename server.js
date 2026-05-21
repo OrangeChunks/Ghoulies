@@ -59,7 +59,7 @@ function newGame(){
 
     /* ghoulies */
     ghouliesCaller:null,
-    finalTurn:false,
+    finalTurnPlayer:null,
 
     gameOver:false
   };
@@ -116,6 +116,12 @@ io.on("connection", socket => {
 
   function isTurn(g,id){
     return g.order[g.turn] === id;
+  }
+
+  function nextTurn(g){
+
+    g.turn =
+      (g.turn + 1) % g.order.length;
   }
 
   /* DRAW */
@@ -190,8 +196,11 @@ io.on("connection", socket => {
       return;
     }
 
-    /* ghoulies final turn */
-    if (g.finalTurn){
+    /* 🔥 FINAL TURN CHECK */
+    if (
+      g.finalTurnPlayer &&
+      socket.id === g.finalTurnPlayer
+    ){
 
       finishRound(g);
 
@@ -203,7 +212,7 @@ io.on("connection", socket => {
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* 🔥 10 OWN CARD */
+  /* 🔥 10 OWN */
   socket.on("tenOwn", card => {
 
     const g = getRoom(socket);
@@ -213,12 +222,13 @@ io.on("connection", socket => {
     if (g.tenSwap.player !== socket.id) return;
 
     g.tenSwap.ownCard = card;
+
     g.tenSwap.selectingOwn = false;
 
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* 🔥 10 OPP CARD */
+  /* 🔥 10 OPP */
   socket.on("tenOpp", oppCard => {
 
     const g = getRoom(socket);
@@ -250,8 +260,11 @@ io.on("connection", socket => {
 
     g.tenSwap = null;
 
-    /* final ghoulies turn */
-    if (g.finalTurn){
+    /* 🔥 FINAL TURN CHECK */
+    if (
+      g.finalTurnPlayer &&
+      socket.id === g.finalTurnPlayer
+    ){
 
       finishRound(g);
 
@@ -297,24 +310,25 @@ io.on("connection", socket => {
 
     if (!g) return;
 
+    /* already called */
     if (g.ghouliesCaller) return;
 
-    g.ghouliesCaller = socket.id;
+    const caller = socket.id;
 
-    g.finalTurn = true;
+    const other =
+      g.order.find(id => id !== caller);
 
-    /* move to OTHER player */
+    g.ghouliesCaller = caller;
+
+    /* ONLY THIS PLAYER GETS FINAL TURN */
+    g.finalTurnPlayer = other;
+
+    /* immediately move to opponent */
     g.turn =
-      (g.turn + 1) % g.order.length;
+      g.order.indexOf(other);
 
     io.to(roomId(socket)).emit("state", g);
   });
-
-  function nextTurn(g){
-
-    g.turn =
-      (g.turn + 1) % g.order.length;
-  }
 
   function finishRound(g){
 
@@ -350,7 +364,7 @@ io.on("connection", socket => {
       g.tenSwap = null;
 
       g.ghouliesCaller = null;
-      g.finalTurn = false;
+      g.finalTurnPlayer = null;
     }
   }
 
