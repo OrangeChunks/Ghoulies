@@ -148,7 +148,7 @@ function render(){
     if (state.tenSwap.selectingOwn){
 
       statusText =
-        "Choose one of YOUR cards to swap";
+        "Choose one of YOUR cards to swap OR click the discard pile to skip";
 
     } else {
 
@@ -288,6 +288,19 @@ document.addEventListener("click", e => {
         }
       }
     }
+
+    return;
+  }
+
+  /* SKIP 10 SPECIAL */
+  if (
+    state.tenSwap &&
+    state.tenSwap.player === myId &&
+    state.tenSwap.selectingOwn &&
+    e.target.closest("#discard")
+  ){
+
+    socket.emit("tenOwn", null);
 
     return;
   }
