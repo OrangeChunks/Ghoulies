@@ -9,7 +9,12 @@ let memoryDone = false;
 
 let shownRoundPopup = false;
 
-socket.emit("join", "room1");
+function connectToRoom(){
+
+  socket.emit("join", "room1");
+}
+
+connectToRoom();
 
 socket.on("you", id => {
   myId = id;
@@ -37,7 +42,6 @@ socket.on("state", g => {
     /* RESET MEMORY PHASE */
     memoryDone = false;
     revealed = [];
-
   }
 
   /* RESET POPUP TRACKER */
@@ -48,12 +52,35 @@ socket.on("state", g => {
   render();
 });
 
+/* FORCE FULL RESET */
+socket.on("forceReload", () => {
+
+  state = null;
+
+  revealed = [];
+  memoryDone = false;
+  shownRoundPopup = false;
+
+  socket.disconnect();
+
+  setTimeout(() => {
+
+    socket.connect();
+
+    connectToRoom();
+
+  }, 500);
+});
+
 function me(){
-  return state.players?.[myId];
+  return state?.players?.[myId];
 }
 
 function oppId(){
-  return state.order?.find(id => id !== myId);
+
+  return state?.order?.find(
+    id => id !== myId
+  );
 }
 
 function file(card){
@@ -106,9 +133,11 @@ function render(){
     state.order[state.turn] === myId;
 
   /* STATUS */
+  let statusText = "";
+
   if (!memoryDone){
 
-    document.getElementById("status").innerText =
+    statusText =
       `Choose 2 cards to memorise (${revealed.length}/2)`;
 
   } else if (
@@ -118,32 +147,39 @@ function render(){
 
     if (state.tenSwap.selectingOwn){
 
-      document.getElementById("status").innerText =
+      statusText =
         "Choose one of YOUR cards to swap";
 
     } else {
 
-      document.getElementById("status").innerText =
+      statusText =
         "Choose an OPPONENT card to swap";
     }
 
   } else {
 
-    document.getElementById("status").innerText =
+    statusText =
       turn ? "Your turn" : "Their turn";
   }
 
   /* SPECIAL MESSAGE */
-  if (state.message){
+  if (
+    state.message &&
+    state.message[myId]
+  ){
 
-    document.getElementById("status").innerText =
-      state.message;
+    statusText =
+      state.message[myId];
   }
+
+  document.getElementById("status").innerText =
+    statusText;
 
   document.getElementById("scores").innerHTML =
     `You: ${state.scores?.[myId] || 0}
      | Opponent: ${state.scores?.[oppId()] || 0}`;
 
+  /* YOUR HAND */
   document.getElementById("hand").innerHTML =
     p?.hand?.map((c,i) => {
 
@@ -165,6 +201,7 @@ function render(){
       `;
     }).join("") || "";
 
+  /* OPPONENT HAND */
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
@@ -182,6 +219,7 @@ function render(){
       `;
     }).join("") || "";
 
+  /* DISCARD */
   const top = state.discard?.at(-1);
 
   document.getElementById("discard").innerHTML =
@@ -189,6 +227,7 @@ function render(){
       ? `<img class="card" src="${file(top)}">`
       : "";
 
+  /* PENDING */
   const pending = p?.pending;
 
   document.getElementById("pending").innerHTML =
@@ -210,6 +249,7 @@ function render(){
       `
       : "";
 
+  /* RESTART */
   document.getElementById("restartBtn").style.display =
     state.gameOver
       ? "block"
@@ -221,6 +261,7 @@ document.addEventListener("click", e => {
 
   if (!state) return;
 
+  /* MEMORY PHASE */
   if (!memoryDone){
 
     if (e.target.dataset.index !== undefined){
@@ -251,6 +292,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* 10 OWN CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -266,6 +308,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* 10 OPP CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -281,6 +324,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* DRAW */
   if (clickedDeck(e.target)){
 
     socket.emit("draw");
@@ -288,13 +332,22 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* TAKE DISCARD OR DISCARD PENDING */
   if (e.target.closest("#discard")){
 
-    socket.emit("takeDiscard");
+    if (me()?.pending){
+
+      socket.emit("discardPending");
+
+    } else {
+
+      socket.emit("takeDiscard");
+    }
 
     return;
   }
 
+  /* NORMAL SWAP */
   if (
     e.target.dataset.card &&
     me()?.pending
@@ -308,6 +361,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* GHOULIES */
   if (e.target.id === "ghouliesBtn"){
 
     socket.emit("callGhoulies");
@@ -315,6 +369,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* RESTART */
   if (e.target.id === "restartBtn"){
 
     socket.emit("restart", "room1");
@@ -322,20 +377,19 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* FULL RESET */
   if (e.target.id === "resetBtn"){
 
-    localStorage.clear();
-
-    sessionStorage.clear();
-
-    socket.disconnect();
-
-    location.reload();
+    socket.emit(
+      "fullReset",
+      "room1"
+    );
 
     return;
   }
 });
 
+/* SNAP */
 document.addEventListener("dblclick", e => {
 
   if (!memoryDone) return;

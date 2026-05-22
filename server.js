@@ -35,6 +35,7 @@ function calculate(hand){
     const v = c.slice(0,-1);
     const s = c.slice(-1);
 
+    /* RED KING = 0 */
     if (
       v === "K" &&
       (s === "♥" || s === "♦")
@@ -272,7 +273,7 @@ io.on("connection", socket => {
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* DISCARD PENDING CARD */
+  /* DISCARD PENDING */
   socket.on("discardPending", () => {
 
     const g = getRoom(socket);
@@ -319,16 +320,16 @@ io.on("connection", socket => {
 
     g.discard.push(discarded);
 
-    /* 10 RULE */
+    /* SPECIAL 10 */
     if (discarded.startsWith("10")){
+
+      const other =
+        g.order.find(id => id !== socket.id);
 
       g.message = {};
 
       g.message[socket.id] =
-        "You used a special 10 card - choose a card to swap.";
-
-      const other =
-        g.order.find(id => id !== socket.id);
+        "You used a special 10 card.";
 
       g.message[other] =
         "Your opponent used a special 10 card.";
@@ -344,12 +345,14 @@ io.on("connection", socket => {
       return;
     }
 
+    g.message = {};
+
     endTurn(g,socket.id);
 
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* 10 PICK OWN */
+  /* 10 OWN */
   socket.on("tenOwn", index => {
 
     const g = getRoom(socket);
@@ -369,7 +372,7 @@ io.on("connection", socket => {
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* 10 PICK OPPONENT */
+  /* 10 OPP */
   socket.on("tenOpp", oppIndex => {
 
     const g = getRoom(socket);
@@ -392,13 +395,6 @@ io.on("connection", socket => {
 
     const i1 = g.tenSwap.ownIndex;
     const i2 = oppIndex;
-
-    if (
-      i1 == null ||
-      i2 == null
-    ){
-      return;
-    }
 
     const temp = p1.hand[i1];
 
@@ -462,10 +458,10 @@ io.on("connection", socket => {
     g.message = {};
 
     g.message[caller] =
-      "You called GHOULIES - your opponent has one final turn.";
+      "You called GHOULIES - opponent gets one final turn.";
 
     g.message[other] =
-      "Your opponent called GHOULIES - you have one final turn.";
+      "Your opponent called GHOULIES - you get one final turn.";
 
     g.ghouliesCaller = caller;
 
@@ -488,10 +484,10 @@ io.on("connection", socket => {
     );
   });
 
-  /* FULL RESET FOR BOTH PLAYERS */
+  /* FULL RESET */
   socket.on("fullReset", room => {
 
-    rooms[room] = newGame();
+    delete rooms[room];
 
     io.to(room).emit(
       "forceReload"
