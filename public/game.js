@@ -148,7 +148,7 @@ function render(){
     if (state.tenSwap.selectingOwn){
 
       statusText =
-        "Choose one of YOUR cards to swap OR click the discard pile to skip";
+        "Choose one of YOUR cards to swap or press NO SWAP";
 
     } else {
 
@@ -249,6 +249,16 @@ function render(){
       `
       : "";
 
+  /* NO SWAP BUTTON */
+  document.getElementById("noSwapBtn").style.display =
+    (
+      state.tenSwap &&
+      state.tenSwap.player === myId &&
+      state.tenSwap.selectingOwn
+    )
+      ? "inline-block"
+      : "none";
+
   /* RESTART */
   document.getElementById("restartBtn").style.display =
     state.gameOver
@@ -265,6 +275,11 @@ document.addEventListener("click", e => {
   if (!memoryDone){
 
     if (e.target.dataset.index !== undefined){
+
+      /* HARD CAP AT 2 */
+      if (revealed.length >= 2){
+        return;
+      }
 
       const i =
         Number(e.target.dataset.index);
@@ -292,13 +307,8 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* SKIP 10 SPECIAL */
-  if (
-    state.tenSwap &&
-    state.tenSwap.player === myId &&
-    state.tenSwap.selectingOwn &&
-    e.target.closest("#discard")
-  ){
+  /* NO SWAP */
+  if (e.target.id === "noSwapBtn"){
 
     socket.emit("tenOwn", null);
 
