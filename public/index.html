@@ -59,7 +59,19 @@ body{
   transform:scale(1.08);
 }
 
-/* 🔥 NEW FLIP ANIMATION */
+/* ACTIVE TURN GLOW */
+.activeTurn{
+  box-shadow:0 0 20px #00ff88;
+  border-radius:10px;
+}
+
+/* TEN SWAP GLOW */
+.tenGlow{
+  box-shadow:0 0 20px gold;
+  border-radius:10px;
+}
+
+/* FLIP */
 .flip{
   animation:flipCard 0.6s ease;
 }
@@ -130,6 +142,15 @@ button{
   #hand,
   #opponentHand{
     gap:6px;
+  }
+
+  button{
+    font-size:14px;
+    padding:8px 12px;
+  }
+
+  #status{
+    font-size:18px;
   }
 }
 

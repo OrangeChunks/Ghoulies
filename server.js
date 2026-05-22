@@ -28,13 +28,25 @@ function createDeck(){
   return shuffle(d);
 }
 
+/* FIXED SCORING */
 function calculate(hand){
 
   return hand.reduce((t,c) => {
 
     const v = c.slice(0,-1);
+    const s = c.slice(-1);
 
-    if (v === "A") return t + 1;
+    /* RED KINGS = 0 */
+    if (
+      v === "K" &&
+      (s === "♥" || s === "♦")
+    ){
+      return t;
+    }
+
+    if (v === "A"){
+      return t + 1;
+    }
 
     if (["J","Q","K"].includes(v)){
       return t + 10;
@@ -57,14 +69,13 @@ function newGame(){
     turn:0,
     scores:{},
 
-    /* 10 RULE */
     tenSwap:null,
 
-    /* GHOULIES */
     ghouliesCaller:null,
     finalTurnPlayer:null,
 
-    gameOver:false
+    gameOver:false,
+    losers:[]
   };
 }
 
@@ -103,7 +114,7 @@ io.on("connection", socket => {
     ){
 
       g.players[socket.id] = {
-        hand:g.deck.splice(0,5),
+        hand:g.deck.splice(0,4),
         pending:null
       };
 
@@ -136,35 +147,50 @@ io.on("connection", socket => {
       const p = g.players[id];
 
       g.scores[id] += calculate(p.hand);
-
-      if (g.scores[id] >= 51){
-        g.gameOver = true;
-      }
     }
 
-    if (!g.gameOver){
+    /* FIXED GAME OVER RULE */
+    const overPlayers =
+      Object.entries(g.scores)
+        .filter(([id,score]) => score >= 51);
 
-      const deck = createDeck();
+    if (overPlayers.length){
 
-      g.deck = deck;
+      const highest =
+        Math.max(
+          ...overPlayers.map(x => x[1])
+        );
 
-      g.discard = [deck.pop()];
+      g.losers =
+        overPlayers
+          .filter(x => x[1] === highest)
+          .map(x => x[0]);
 
-      for (let id of g.order){
+      g.gameOver = true;
 
-        g.players[id] = {
-          hand:deck.splice(0,5),
-          pending:null
-        };
-      }
-
-      g.turn = 0;
-
-      g.tenSwap = null;
-
-      g.ghouliesCaller = null;
-      g.finalTurnPlayer = null;
+      return;
     }
+
+    const deck = createDeck();
+
+    g.deck = deck;
+
+    g.discard = [deck.pop()];
+
+    for (let id of g.order){
+
+      g.players[id] = {
+        hand:deck.splice(0,4),
+        pending:null
+      };
+    }
+
+    g.turn = 0;
+
+    g.tenSwap = null;
+
+    g.ghouliesCaller = null;
+    g.finalTurnPlayer = null;
   }
 
   function endTurn(g,id){
@@ -245,15 +271,12 @@ io.on("connection", socket => {
 
     g.discard.push(discarded);
 
-    /* 🔥 10 RULE */
+    /* 10 RULE */
     if (discarded.startsWith("10")){
 
       g.tenSwap = {
         player:socket.id,
-
-        /* stage 1 = choose own */
         selectingOwn:true,
-
         ownIndex:null
       };
 
@@ -267,7 +290,7 @@ io.on("connection", socket => {
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* 🔥 10 PICK OWN CARD */
+  /* 10 PICK OWN */
   socket.on("tenOwn", index => {
 
     const g = getRoom(socket);
@@ -282,13 +305,12 @@ io.on("connection", socket => {
 
     g.tenSwap.ownIndex = index;
 
-    /* move to opponent selection */
     g.tenSwap.selectingOwn = false;
 
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* 🔥 10 PICK OPPONENT CARD */
+  /* 10 PICK OPPONENT */
   socket.on("tenOpp", oppIndex => {
 
     const g = getRoom(socket);
@@ -331,7 +353,7 @@ io.on("connection", socket => {
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* SNAP */
+  /* FIXED SNAP */
   socket.on("snap", card => {
 
     const g = getRoom(socket);
@@ -349,8 +371,12 @@ io.on("connection", socket => {
       card.slice(0,-1)
     ){
 
-      p.hand =
-        p.hand.filter(c => c !== card);
+      const index =
+        p.hand.indexOf(card);
+
+      if (index !== -1){
+        p.hand.splice(index,1);
+      }
 
       g.discard.push(card);
     }
@@ -374,7 +400,6 @@ io.on("connection", socket => {
 
     g.ghouliesCaller = caller;
 
-    /* ONLY opponent gets final turn */
     g.finalTurnPlayer = other;
 
     g.turn =

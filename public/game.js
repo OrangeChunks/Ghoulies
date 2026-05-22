@@ -145,7 +145,6 @@ function render(){
       return `
         <img
           class="card ${tenGlow ? "tenGlow" : ""}"
-          data-opp="${c}"
           data-oppindex="${i}"
           src="${back()}"
         >
@@ -230,12 +229,12 @@ document.addEventListener("click", e => {
     state.tenSwap &&
     state.tenSwap.player === myId &&
     state.tenSwap.selectingOwn &&
-    e.target.dataset.card
+    e.target.dataset.index !== undefined
   ){
 
     socket.emit(
       "tenOwn",
-      e.target.dataset.card
+      Number(e.target.dataset.index)
     );
 
     return;
@@ -246,12 +245,12 @@ document.addEventListener("click", e => {
     state.tenSwap &&
     state.tenSwap.player === myId &&
     !state.tenSwap.selectingOwn &&
-    e.target.dataset.opp
+    e.target.dataset.oppindex !== undefined
   ){
 
     socket.emit(
       "tenOpp",
-      e.target.dataset.opp
+      Number(e.target.dataset.oppindex)
     );
 
     return;
@@ -269,6 +268,10 @@ document.addEventListener("click", e => {
 
       deck.classList.add("flip");
 
+      if (navigator.vibrate){
+        navigator.vibrate(30);
+      }
+
       setTimeout(() => {
         deck.classList.remove("flip");
       }, 600);
@@ -281,6 +284,10 @@ document.addEventListener("click", e => {
   if (e.target.closest("#discard")){
 
     socket.emit("takeDiscard");
+
+    if (navigator.vibrate){
+      navigator.vibrate(30);
+    }
 
     return;
   }
@@ -295,6 +302,10 @@ document.addEventListener("click", e => {
       "swap",
       e.target.dataset.card
     );
+
+    if (navigator.vibrate){
+      navigator.vibrate(40);
+    }
 
     return;
   }
@@ -325,6 +336,10 @@ document.addEventListener("dblclick", e => {
     e.target.dataset.card;
 
   if (c){
+
+    if (navigator.vibrate){
+      navigator.vibrate(50);
+    }
 
     socket.emit("snap", c);
   }
