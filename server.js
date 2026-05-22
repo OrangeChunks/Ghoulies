@@ -75,7 +75,7 @@ function newGame(){
     gameOver:false,
     losers:[],
 
-    message:"",
+    message:{},
     roundResult:null
   };
 }
@@ -95,6 +95,12 @@ function roomId(socket){
 
   return [...socket.rooms]
     .find(r => r !== socket.id);
+}
+
+function roomIdFromGame(targetGame){
+
+  return Object.keys(rooms)
+    .find(r => rooms[r] === targetGame);
 }
 
 io.on("connection", socket => {
@@ -159,6 +165,8 @@ io.on("connection", socket => {
 
     g.roundResult = roundScores;
 
+    io.to(roomIdFromGame(g)).emit("state", g);
+
     const overPlayers =
       Object.entries(g.scores)
         .filter(([id,score]) => score >= 51);
@@ -203,7 +211,7 @@ io.on("connection", socket => {
       g.ghouliesCaller = null;
       g.finalTurnPlayer = null;
 
-      g.message = "";
+      g.message = {};
       g.roundResult = null;
 
       io.to(roomIdFromGame(g)).emit("state", g);
@@ -224,12 +232,6 @@ io.on("connection", socket => {
 
       nextTurn(g);
     }
-  }
-
-  function roomIdFromGame(targetGame){
-
-    return Object.keys(rooms)
-      .find(r => rooms[r] === targetGame);
   }
 
   /* DRAW */
@@ -270,6 +272,28 @@ io.on("connection", socket => {
     io.to(roomId(socket)).emit("state", g);
   });
 
+  /* DISCARD PENDING CARD */
+  socket.on("discardPending", () => {
+
+    const g = getRoom(socket);
+
+    if (!g) return;
+
+    if (!isTurn(g,socket.id)) return;
+
+    const p = g.players[socket.id];
+
+    if (!p.pending) return;
+
+    g.discard.push(p.pending);
+
+    p.pending = null;
+
+    endTurn(g,socket.id);
+
+    io.to(roomId(socket)).emit("state", g);
+  });
+
   /* SWAP */
   socket.on("swap", card => {
 
@@ -295,10 +319,19 @@ io.on("connection", socket => {
 
     g.discard.push(discarded);
 
+    /* 10 RULE */
     if (discarded.startsWith("10")){
 
-      g.message =
-        "A player used a 10 card special.";
+      g.message = {};
+
+      g.message[socket.id] =
+        "You used a special 10 card - choose a card to swap.";
+
+      const other =
+        g.order.find(id => id !== socket.id);
+
+      g.message[other] =
+        "Your opponent used a special 10 card.";
 
       g.tenSwap = {
         player:socket.id,
@@ -374,6 +407,8 @@ io.on("connection", socket => {
 
     g.tenSwap = null;
 
+    g.message = {};
+
     endTurn(g,playerId);
 
     io.to(roomId(socket)).emit("state", g);
@@ -424,8 +459,13 @@ io.on("connection", socket => {
     const other =
       g.order.find(id => id !== caller);
 
-    g.message =
-      "A player called GHOULIES! Final turn!";
+    g.message = {};
+
+    g.message[caller] =
+      "You called GHOULIES - your opponent has one final turn.";
+
+    g.message[other] =
+      "Your opponent called GHOULIES - you have one final turn.";
 
     g.ghouliesCaller = caller;
 
@@ -445,6 +485,16 @@ io.on("connection", socket => {
     io.to(room).emit(
       "state",
       rooms[room]
+    );
+  });
+
+  /* FULL RESET FOR BOTH PLAYERS */
+  socket.on("fullReset", room => {
+
+    rooms[room] = newGame();
+
+    io.to(room).emit(
+      "forceReload"
     );
   });
 
