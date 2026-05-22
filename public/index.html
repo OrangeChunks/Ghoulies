@@ -44,7 +44,10 @@ body{
   gap:10px;
   min-height:120px;
   width:100%;
+  max-width:100vw;
   padding:10px;
+  box-sizing:border-box;
+  overflow-x:auto;
 }
 
 /* CARDS */
@@ -126,6 +129,11 @@ button{
   display:none;
 }
 
+#resetBtn{
+  background:#ff4444;
+  color:white;
+}
+
 /* MOBILE */
 @media(max-width:600px){
 
@@ -192,9 +200,15 @@ button{
 
 <!-- ACTIONS -->
 <div class="row">
+
   <button id="ghouliesBtn">
     Call Ghoulies
   </button>
+
+  <button id="resetBtn">
+    Reset Game
+  </button>
+
 </div>
 
 <script src="/socket.io/socket.io.js"></script>

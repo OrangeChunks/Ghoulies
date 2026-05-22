@@ -224,7 +224,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 OWN CARD */
+  /* 10 OWN CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -240,7 +240,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 🔥 10 OPP CARD */
+  /* 10 OPP CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -322,6 +322,20 @@ document.addEventListener("click", e => {
   if (e.target.id === "restartBtn"){
 
     socket.emit("restart", "room1");
+
+    return;
+  }
+
+  /* FULL RESET */
+  if (e.target.id === "resetBtn"){
+
+    localStorage.clear();
+
+    sessionStorage.clear();
+
+    socket.disconnect();
+
+    location.reload();
 
     return;
   }
