@@ -7,6 +7,8 @@ let myId = null;
 let revealed = [];
 let memoryDone = false;
 
+let shownRoundPopup = false;
+
 socket.emit("join", "room1");
 
 socket.on("you", id => {
@@ -14,7 +16,35 @@ socket.on("you", id => {
 });
 
 socket.on("state", g => {
+
   state = g;
+
+  /* ROUND POPUP */
+  if (
+    state.roundResult &&
+    !shownRoundPopup
+  ){
+
+    shownRoundPopup = true;
+
+    const myScore =
+      state.roundResult[myId];
+
+    alert(
+      `Round Over!\n\nYou scored ${myScore} points this round.`
+    );
+
+    /* RESET MEMORY PHASE */
+    memoryDone = false;
+    revealed = [];
+
+  }
+
+  /* RESET POPUP TRACKER */
+  if (!state.roundResult){
+    shownRoundPopup = false;
+  }
+
   render();
 });
 
@@ -26,7 +56,6 @@ function oppId(){
   return state.order?.find(id => id !== myId);
 }
 
-/* CARD IMAGE */
 function file(card){
 
   const v = card.slice(0,-1);
@@ -62,12 +91,10 @@ function back(){
   return "/cards/back.png";
 }
 
-/* DECK CLICK FIX */
 function clickedDeck(el){
   return el.id === "deck" || el.closest("#deck");
 }
 
-/* MAIN RENDER */
 function render(){
 
   if (!state || !myId) return;
@@ -106,12 +133,17 @@ function render(){
       turn ? "Your turn" : "Their turn";
   }
 
-  /* SCORES */
+  /* SPECIAL MESSAGE */
+  if (state.message){
+
+    document.getElementById("status").innerText =
+      state.message;
+  }
+
   document.getElementById("scores").innerHTML =
     `You: ${state.scores?.[myId] || 0}
      | Opponent: ${state.scores?.[oppId()] || 0}`;
 
-  /* YOUR HAND */
   document.getElementById("hand").innerHTML =
     p?.hand?.map((c,i) => {
 
@@ -133,7 +165,6 @@ function render(){
       `;
     }).join("") || "";
 
-  /* OPPONENT HAND */
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
@@ -151,7 +182,6 @@ function render(){
       `;
     }).join("") || "";
 
-  /* DISCARD */
   const top = state.discard?.at(-1);
 
   document.getElementById("discard").innerHTML =
@@ -159,7 +189,6 @@ function render(){
       ? `<img class="card" src="${file(top)}">`
       : "";
 
-  /* PENDING */
   const pending = p?.pending;
 
   document.getElementById("pending").innerHTML =
@@ -181,7 +210,6 @@ function render(){
       `
       : "";
 
-  /* RESTART */
   document.getElementById("restartBtn").style.display =
     state.gameOver
       ? "block"
@@ -193,7 +221,6 @@ document.addEventListener("click", e => {
 
   if (!state) return;
 
-  /* MEMORY PHASE */
   if (!memoryDone){
 
     if (e.target.dataset.index !== undefined){
@@ -224,7 +251,6 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 10 OWN CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -240,7 +266,6 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 10 OPP CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -256,43 +281,20 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* DRAW */
   if (clickedDeck(e.target)){
 
     socket.emit("draw");
 
-    const deck =
-      document.querySelector("#deck img");
-
-    if (deck){
-
-      deck.classList.add("flip");
-
-      if (navigator.vibrate){
-        navigator.vibrate(30);
-      }
-
-      setTimeout(() => {
-        deck.classList.remove("flip");
-      }, 600);
-    }
-
     return;
   }
 
-  /* TAKE DISCARD */
   if (e.target.closest("#discard")){
 
     socket.emit("takeDiscard");
 
-    if (navigator.vibrate){
-      navigator.vibrate(30);
-    }
-
     return;
   }
 
-  /* NORMAL SWAP */
   if (
     e.target.dataset.card &&
     me()?.pending
@@ -303,14 +305,9 @@ document.addEventListener("click", e => {
       e.target.dataset.card
     );
 
-    if (navigator.vibrate){
-      navigator.vibrate(40);
-    }
-
     return;
   }
 
-  /* GHOULIES */
   if (e.target.id === "ghouliesBtn"){
 
     socket.emit("callGhoulies");
@@ -318,7 +315,6 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* RESTART */
   if (e.target.id === "restartBtn"){
 
     socket.emit("restart", "room1");
@@ -326,7 +322,6 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* FULL RESET */
   if (e.target.id === "resetBtn"){
 
     localStorage.clear();
@@ -341,7 +336,6 @@ document.addEventListener("click", e => {
   }
 });
 
-/* SNAP */
 document.addEventListener("dblclick", e => {
 
   if (!memoryDone) return;
@@ -350,10 +344,6 @@ document.addEventListener("dblclick", e => {
     e.target.dataset.card;
 
   if (c){
-
-    if (navigator.vibrate){
-      navigator.vibrate(50);
-    }
 
     socket.emit("snap", c);
   }

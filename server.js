@@ -28,7 +28,6 @@ function createDeck(){
   return shuffle(d);
 }
 
-/* FIXED SCORING */
 function calculate(hand){
 
   return hand.reduce((t,c) => {
@@ -36,7 +35,6 @@ function calculate(hand){
     const v = c.slice(0,-1);
     const s = c.slice(-1);
 
-    /* RED KINGS = 0 */
     if (
       v === "K" &&
       (s === "♥" || s === "♦")
@@ -75,7 +73,10 @@ function newGame(){
     finalTurnPlayer:null,
 
     gameOver:false,
-    losers:[]
+    losers:[],
+
+    message:"",
+    roundResult:null
   };
 }
 
@@ -142,14 +143,22 @@ io.on("connection", socket => {
 
   function finishRound(g){
 
+    const roundScores = {};
+
     for (let id of g.order){
 
       const p = g.players[id];
 
-      g.scores[id] += calculate(p.hand);
+      const score =
+        calculate(p.hand);
+
+      roundScores[id] = score;
+
+      g.scores[id] += score;
     }
 
-    /* FIXED GAME OVER RULE */
+    g.roundResult = roundScores;
+
     const overPlayers =
       Object.entries(g.scores)
         .filter(([id,score]) => score >= 51);
@@ -171,26 +180,35 @@ io.on("connection", socket => {
       return;
     }
 
-    const deck = createDeck();
+    setTimeout(() => {
 
-    g.deck = deck;
+      const deck = createDeck();
 
-    g.discard = [deck.pop()];
+      g.deck = deck;
 
-    for (let id of g.order){
+      g.discard = [deck.pop()];
 
-      g.players[id] = {
-        hand:deck.splice(0,4),
-        pending:null
-      };
-    }
+      for (let id of g.order){
 
-    g.turn = 0;
+        g.players[id] = {
+          hand:deck.splice(0,4),
+          pending:null
+        };
+      }
 
-    g.tenSwap = null;
+      g.turn = 0;
 
-    g.ghouliesCaller = null;
-    g.finalTurnPlayer = null;
+      g.tenSwap = null;
+
+      g.ghouliesCaller = null;
+      g.finalTurnPlayer = null;
+
+      g.message = "";
+      g.roundResult = null;
+
+      io.to(roomIdFromGame(g)).emit("state", g);
+
+    }, 6000);
   }
 
   function endTurn(g,id){
@@ -206,6 +224,12 @@ io.on("connection", socket => {
 
       nextTurn(g);
     }
+  }
+
+  function roomIdFromGame(targetGame){
+
+    return Object.keys(rooms)
+      .find(r => rooms[r] === targetGame);
   }
 
   /* DRAW */
@@ -271,8 +295,10 @@ io.on("connection", socket => {
 
     g.discard.push(discarded);
 
-    /* 10 RULE */
     if (discarded.startsWith("10")){
+
+      g.message =
+        "A player used a 10 card special.";
 
       g.tenSwap = {
         player:socket.id,
@@ -353,7 +379,7 @@ io.on("connection", socket => {
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* FIXED SNAP */
+  /* SNAP */
   socket.on("snap", card => {
 
     const g = getRoom(socket);
@@ -397,6 +423,9 @@ io.on("connection", socket => {
 
     const other =
       g.order.find(id => id !== caller);
+
+    g.message =
+      "A player called GHOULIES! Final turn!";
 
     g.ghouliesCaller = caller;
 
