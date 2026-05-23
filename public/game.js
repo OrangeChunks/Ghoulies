@@ -173,17 +173,20 @@ function pulseCard(selector){
   },700);
 }
 function highlightCard(el, color="#00ff88"){
-
   if (!el) return;
 
-  el.style.outline = `4px solid ${color}`;
-  el.style.transform = "scale(1.15)";
-  el.style.transition = "0.2s";
+  el.style.outline = `5px solid ${color}`;
+  el.style.boxShadow = `0 0 20px ${color}`;
+  el.style.transform = "scale(1.2) translateY(-10px)";
+  el.style.zIndex = "10";
+  el.style.transition = "0.15s";
 
   setTimeout(() => {
     el.style.outline = "";
+    el.style.boxShadow = "";
     el.style.transform = "";
-  }, 800);
+    el.style.zIndex = "";
+  }, 900);
 }
 
 socket.on("state", g => {
@@ -246,6 +249,12 @@ socket.on("state", g => {
 
 case "swap":
 
+handEl.classList.add("swapping");
+
+setTimeout(()=>{
+  handEl.classList.remove("swapping");
+},400);
+
   showText("SWAP", "#ffd000");
 
   const handSelector =
@@ -256,14 +265,22 @@ case "swap":
   const handEl = document.querySelector(handSelector);
 
   // 🔥 highlight target slot FIRST
-  highlightCard(handEl, "#ffd000");
+ highlightCard(handEl,"#ffd000");
 
-  // 🔥 animate incoming card → slot
-  animateCard(
-    actor.pending,
-    handEl,
-    "/cards/back.png"
-  );
+// ⬇️ ADD THIS DELAY
+setTimeout(()=>{
+
+  animateCard(actor.pending, handEl, "/cards/back.png");
+
+  setTimeout(()=>{
+    animateCard(
+      handEl,
+      document.getElementById("discard"),
+      "/cards/back.png"
+    );
+  },150);
+
+},200);
 
   // 🔥 animate outgoing card → discard
   setTimeout(() => {
@@ -331,6 +348,14 @@ case "swap":
 
 case "tenSwap":
 
+ownEl.classList.add("swapping");
+oppEl.classList.add("swapping");
+
+setTimeout(()=>{
+  ownEl.classList.remove("swapping");
+  oppEl.classList.remove("swapping");
+},400);
+
   showText("SPECIAL 10", "gold");
 
   const mine =
@@ -348,10 +373,16 @@ case "tenSwap":
 
   const ownEl = document.querySelector(ownSelector);
   const oppEl = document.querySelector(oppSelector);
+highlightCard(ownEl,"#00ffcc");
+highlightCard(oppEl,"#ff00ff");
 
-  // 🔥 highlight BOTH cards clearly
-  highlightCard(ownEl, "#00ffcc"); // yours
-  highlightCard(oppEl, "#ff00ff"); // theirs
+// ⬇️ ADD DELAY HERE
+setTimeout(()=>{
+
+  animateCard(ownEl, oppEl, "/cards/back.png");
+  animateCard(oppEl, ownEl, "/cards/back.png");
+
+},250);
 
   // 🔥 delay so players SEE selection first
   setTimeout(() => {

@@ -55,6 +55,11 @@ body{
   user-select:none;
 }
 
+.card.swapping {
+  opacity: 0.25;
+  transition: 0.2s;
+}
+
 .card:hover{
   transform:scale(1.08);
 }
