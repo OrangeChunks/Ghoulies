@@ -35,7 +35,6 @@ function calculate(hand){
     const v = c.slice(0,-1);
     const s = c.slice(-1);
 
-    /* RED KING = 0 */
     if (
       v === "K" &&
       (s === "♥" || s === "♦")
@@ -66,6 +65,7 @@ function newGame(){
     players:{},
     order:[],
     turn:0,
+    startingPlayer:0,
     scores:{},
 
     tenSwap:null,
@@ -77,7 +77,11 @@ function newGame(){
     losers:[],
 
     message:{},
-    roundResult:null
+    roundResult:null,
+
+    skipTurn:{},
+
+    effect:null
   };
 }
 
@@ -144,24 +148,78 @@ io.on("connection", socket => {
 
   function nextTurn(g){
 
-    g.turn =
-      (g.turn + 1) % g.order.length;
+    do {
+
+      g.turn =
+        (g.turn + 1) % g.order.length;
+
+      const id =
+        g.order[g.turn];
+
+      if (g.skipTurn[id]){
+
+        delete g.skipTurn[id];
+
+        g.effect = {
+          type:"skip",
+          player:id
+        };
+
+      } else {
+        break;
+      }
+
+    } while(true);
   }
 
   function finishRound(g){
 
     const roundScores = {};
 
+    const totals = {};
+
     for (let id of g.order){
 
       const p = g.players[id];
 
-      const score =
+      let score =
         calculate(p.hand);
 
-      roundScores[id] = score;
+      /* GHOULIES BONUS/PENALTY */
+      if (g.ghouliesCaller === id){
+
+        const other =
+          g.order.find(x => x !== id);
+
+        const myScore =
+          calculate(g.players[id].hand);
+
+        const otherScore =
+          calculate(g.players[other].hand);
+
+        if (myScore < otherScore){
+
+          score -= 5;
+
+          roundScores[id] =
+            `${score} (-5 for winning Ghoulies)`;
+
+        } else {
+
+          score += 5;
+
+          roundScores[id] =
+            `${score} (+5 for losing/drawing Ghoulies)`;
+        }
+
+      } else {
+
+        roundScores[id] = score;
+      }
 
       g.scores[id] += score;
+
+      totals[id] = g.scores[id];
     }
 
     g.roundResult = roundScores;
@@ -205,7 +263,13 @@ io.on("connection", socket => {
         };
       }
 
-      g.turn = 0;
+      /* ALTERNATE FIRST PLAYER */
+      g.startingPlayer =
+        (g.startingPlayer + 1)
+        % g.order.length;
+
+      g.turn =
+        g.startingPlayer;
 
       g.tenSwap = null;
 
@@ -214,6 +278,8 @@ io.on("connection", socket => {
 
       g.message = {};
       g.roundResult = null;
+
+      g.effect = null;
 
       io.to(roomIdFromGame(g)).emit("state", g);
 
@@ -235,7 +301,6 @@ io.on("connection", socket => {
     }
   }
 
-  /* DRAW */
   socket.on("draw", () => {
 
     const g = getRoom(socket);
@@ -250,10 +315,14 @@ io.on("connection", socket => {
 
     p.pending = g.deck.pop();
 
+    g.effect = {
+      type:"drawDeck",
+      player:socket.id
+    };
+
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* TAKE DISCARD */
   socket.on("takeDiscard", () => {
 
     const g = getRoom(socket);
@@ -270,17 +339,19 @@ io.on("connection", socket => {
 
     p.pending = g.discard.pop();
 
+    g.effect = {
+      type:"takeDiscard",
+      player:socket.id
+    };
+
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* DISCARD PENDING */
   socket.on("discardPending", () => {
 
     const g = getRoom(socket);
 
     if (!g) return;
-
-    if (!isTurn(g,socket.id)) return;
 
     const p = g.players[socket.id];
 
@@ -290,37 +361,46 @@ io.on("connection", socket => {
 
     p.pending = null;
 
+    g.effect = {
+      type:"discard",
+      player:socket.id
+    };
+
     endTurn(g,socket.id);
 
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* SWAP */
   socket.on("swap", card => {
 
     const g = getRoom(socket);
 
     if (!g) return;
 
-    if (!isTurn(g,socket.id)) return;
-
     const p = g.players[socket.id];
 
     if (!p.pending) return;
 
-    const i = p.hand.indexOf(card);
+    const i =
+      p.hand.indexOf(card);
 
     if (i === -1) return;
 
-    const discarded = p.hand[i];
+    const discarded =
+      p.hand[i];
 
-    p.hand[i] = p.pending;
+    p.hand[i] =
+      p.pending;
 
     p.pending = null;
 
     g.discard.push(discarded);
 
-    /* SPECIAL 10 */
+    g.effect = {
+      type:"swap",
+      player:socket.id
+    };
+
     if (discarded.startsWith("10")){
 
       const other =
@@ -332,7 +412,7 @@ io.on("connection", socket => {
         "You used a special 10 card.";
 
       g.message[other] =
-        "Your opponent used a special 10 card.";
+        "Opponent used a special 10 card.";
 
       g.tenSwap = {
         player:socket.id,
@@ -345,14 +425,11 @@ io.on("connection", socket => {
       return;
     }
 
-    g.message = {};
-
     endTurn(g,socket.id);
 
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* 10 OWN */
   socket.on("tenOwn", index => {
 
     const g = getRoom(socket);
@@ -361,7 +438,20 @@ io.on("connection", socket => {
 
     if (!g.tenSwap) return;
 
-    if (g.tenSwap.player !== socket.id){
+    /* NO SWAP */
+    if (index == null){
+
+      g.effect = {
+        type:"noSwap",
+        player:socket.id
+      };
+
+      g.tenSwap = null;
+
+      endTurn(g,socket.id);
+
+      io.to(roomId(socket)).emit("state", g);
+
       return;
     }
 
@@ -372,54 +462,59 @@ io.on("connection", socket => {
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* 10 OPP */
   socket.on("tenOpp", oppIndex => {
 
     const g = getRoom(socket);
 
     if (!g) return;
 
-    if (!g.tenSwap) return;
-
-    const playerId = g.tenSwap.player;
-
-    if (playerId !== socket.id){
-      return;
-    }
+    const playerId =
+      g.tenSwap.player;
 
     const oppId =
       g.order.find(id => id !== playerId);
 
-    const p1 = g.players[playerId];
-    const p2 = g.players[oppId];
+    const p1 =
+      g.players[playerId];
 
-    const i1 = g.tenSwap.ownIndex;
-    const i2 = oppIndex;
+    const p2 =
+      g.players[oppId];
 
-    const temp = p1.hand[i1];
+    const i1 =
+      g.tenSwap.ownIndex;
 
-    p1.hand[i1] = p2.hand[i2];
-    p2.hand[i2] = temp;
+    const temp =
+      p1.hand[i1];
+
+    p1.hand[i1] =
+      p2.hand[oppIndex];
+
+    p2.hand[oppIndex] =
+      temp;
+
+    g.effect = {
+      type:"tenSwap",
+      player:playerId
+    };
 
     g.tenSwap = null;
-
-    g.message = {};
 
     endTurn(g,playerId);
 
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* SNAP */
   socket.on("snap", card => {
 
     const g = getRoom(socket);
 
     if (!g) return;
 
-    const p = g.players[socket.id];
+    const p =
+      g.players[socket.id];
 
-    const top = g.discard.at(-1);
+    const top =
+      g.discard.at(-1);
 
     if (!top) return;
 
@@ -436,12 +531,25 @@ io.on("connection", socket => {
       }
 
       g.discard.push(card);
+
+      g.effect = {
+        type:"snapSuccess",
+        player:socket.id
+      };
+
+    } else {
+
+      g.skipTurn[socket.id] = true;
+
+      g.effect = {
+        type:"snapFail",
+        player:socket.id
+      };
     }
 
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* GHOULIES */
   socket.on("callGhoulies", () => {
 
     const g = getRoom(socket);
@@ -458,10 +566,15 @@ io.on("connection", socket => {
     g.message = {};
 
     g.message[caller] =
-      "You called GHOULIES - opponent gets one final turn.";
+      "You called GHOULIES.";
 
     g.message[other] =
-      "Your opponent called GHOULIES - you get one final turn.";
+      "Opponent called GHOULIES.";
+
+    g.effect = {
+      type:"ghoulies",
+      player:caller
+    };
 
     g.ghouliesCaller = caller;
 
@@ -473,25 +586,22 @@ io.on("connection", socket => {
     io.to(roomId(socket)).emit("state", g);
   });
 
-  /* RESTART */
-  socket.on("restart", room => {
-
-    rooms[room] = newGame();
-
-    io.to(room).emit(
-      "state",
-      rooms[room]
-    );
-  });
-
-  /* FULL RESET */
   socket.on("fullReset", room => {
 
     delete rooms[room];
 
-    io.to(room).emit(
-      "forceReload"
-    );
+    io.to(room).emit("forceReload");
+
+    setTimeout(() => {
+
+      io.sockets.sockets.forEach(s => {
+
+        s.leave(room);
+
+      });
+
+    }, 200);
+
   });
 
   socket.on("disconnect", () => {

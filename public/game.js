@@ -3,14 +3,12 @@ let socket = io();
 let state = null;
 let myId = null;
 
-/* MEMORY PHASE */
 let revealed = [];
 let memoryDone = false;
 
 let shownRoundPopup = false;
 
 function connectToRoom(){
-
   socket.emit("join", "room1");
 }
 
@@ -24,7 +22,24 @@ socket.on("state", g => {
 
   state = g;
 
-  /* ROUND POPUP */
+  /* WIN/LOSE */
+  if (state.gameOver){
+
+    if (state.losers.includes(myId)){
+
+      setTimeout(() => {
+        alert("YOU LOSE");
+      }, 500);
+
+    } else {
+
+      setTimeout(() => {
+        alert("YOU WIN");
+      }, 500);
+    }
+  }
+
+  /* ROUND */
   if (
     state.roundResult &&
     !shownRoundPopup
@@ -32,44 +47,54 @@ socket.on("state", g => {
 
     shownRoundPopup = true;
 
-    const myScore =
-      state.roundResult[myId];
-
     alert(
-      `Round Over!\n\nYou scored ${myScore} points this round.`
+      `Round Over!\n\nYou scored ${state.roundResult[myId]} points this round.`
     );
 
-    /* RESET MEMORY PHASE */
     memoryDone = false;
     revealed = [];
   }
 
-  /* RESET POPUP TRACKER */
   if (!state.roundResult){
     shownRoundPopup = false;
+  }
+
+  /* EFFECTS */
+  if (
+    state.effect &&
+    state.effect.player !== myId
+  ){
+
+    const effects = {
+      drawDeck:"Opponent drew from deck",
+      takeDiscard:"Opponent took discard",
+      discard:"Opponent discarded a card",
+      swap:"Opponent swapped a card",
+      tenSwap:"Opponent used special 10 swap",
+      noSwap:"Opponent cancelled special 10 swap",
+      ghoulies:"Opponent called GHOULIES",
+      snapSuccess:"Opponent snapped successfully",
+      snapFail:"Opponent failed a snap and misses next turn",
+      skip:"Opponent loses a turn"
+    };
+
+    document.getElementById("effect").innerText =
+      effects[state.effect.type] || "";
+
+    setTimeout(() => {
+
+      document.getElementById("effect").innerText =
+        "";
+
+    }, 2500);
   }
 
   render();
 });
 
-/* FORCE FULL RESET */
 socket.on("forceReload", () => {
 
-  state = null;
-
-  revealed = [];
-  memoryDone = false;
-  shownRoundPopup = false;
-
-  socket.disconnect();
-
-  setTimeout(() => {
-
-    socket.connect();
-
-    connectToRoom();
-
-  }, 500);
+  location.reload();
 });
 
 function me(){
@@ -77,7 +102,6 @@ function me(){
 }
 
 function oppId(){
-
   return state?.order?.find(
     id => id !== myId
   );
@@ -118,10 +142,6 @@ function back(){
   return "/cards/back.png";
 }
 
-function clickedDeck(el){
-  return el.id === "deck" || el.closest("#deck");
-}
-
 function render(){
 
   if (!state || !myId) return;
@@ -129,71 +149,19 @@ function render(){
   const p = me();
   const o = state.players?.[oppId()];
 
-  const turn =
-    state.order[state.turn] === myId;
-
-  /* STATUS */
-  let statusText = "";
-
-  if (!memoryDone){
-
-    statusText =
-      `Choose 2 cards to memorise (${revealed.length}/2)`;
-
-  } else if (
-    state.tenSwap &&
-    state.tenSwap.player === myId
-  ){
-
-    if (state.tenSwap.selectingOwn){
-
-      statusText =
-        "Choose one of YOUR cards to swap or press NO SWAP";
-
-    } else {
-
-      statusText =
-        "Choose an OPPONENT card to swap";
-    }
-
-  } else {
-
-    statusText =
-      turn ? "Your turn" : "Their turn";
-  }
-
-  /* SPECIAL MESSAGE */
-  if (
-    state.message &&
-    state.message[myId]
-  ){
-
-    statusText =
-      state.message[myId];
-  }
-
-  document.getElementById("status").innerText =
-    statusText;
-
   document.getElementById("scores").innerHTML =
     `You: ${state.scores?.[myId] || 0}
      | Opponent: ${state.scores?.[oppId()] || 0}`;
 
-  /* YOUR HAND */
   document.getElementById("hand").innerHTML =
     p?.hand?.map((c,i) => {
 
       const visible =
         revealed.includes(i);
 
-      const tenGlow =
-        state.tenSwap &&
-        state.tenSwap.player === myId &&
-        state.tenSwap.selectingOwn;
-
       return `
         <img
-          class="card ${tenGlow ? "tenGlow" : ""}"
+          class="card"
           data-card="${c}"
           data-index="${i}"
           src="${visible ? file(c) : back()}"
@@ -201,25 +169,18 @@ function render(){
       `;
     }).join("") || "";
 
-  /* OPPONENT HAND */
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
-      const tenGlow =
-        state.tenSwap &&
-        state.tenSwap.player === myId &&
-        !state.tenSwap.selectingOwn;
-
       return `
         <img
-          class="card ${tenGlow ? "tenGlow" : ""}"
+          class="card"
           data-oppindex="${i}"
           src="${back()}"
         >
       `;
     }).join("") || "";
 
-  /* DISCARD */
   const top = state.discard?.at(-1);
 
   document.getElementById("discard").innerHTML =
@@ -227,29 +188,6 @@ function render(){
       ? `<img class="card" src="${file(top)}">`
       : "";
 
-  /* PENDING */
-  const pending = p?.pending;
-
-  document.getElementById("pending").innerHTML =
-    pending && turn
-      ? `
-        <div style="margin-top:10px">
-
-          <div style="margin-bottom:6px">
-            You picked up:
-          </div>
-
-          <img
-            class="card flip"
-            src="${file(pending)}"
-            style="width:80px"
-          >
-
-        </div>
-      `
-      : "";
-
-  /* NO SWAP BUTTON */
   document.getElementById("noSwapBtn").style.display =
     (
       state.tenSwap &&
@@ -258,25 +196,16 @@ function render(){
     )
       ? "inline-block"
       : "none";
-
-  /* RESTART */
-  document.getElementById("restartBtn").style.display =
-    state.gameOver
-      ? "block"
-      : "none";
 }
 
-/* CLICK EVENTS */
 document.addEventListener("click", e => {
 
   if (!state) return;
 
-  /* MEMORY PHASE */
   if (!memoryDone){
 
     if (e.target.dataset.index !== undefined){
 
-      /* HARD CAP AT 2 */
       if (revealed.length >= 2){
         return;
       }
@@ -307,7 +236,6 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* NO SWAP */
   if (e.target.id === "noSwapBtn"){
 
     socket.emit("tenOwn", null);
@@ -315,7 +243,6 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 10 OWN CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -331,7 +258,6 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* 10 OPP CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -347,15 +273,30 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* DRAW */
-  if (clickedDeck(e.target)){
+  if (e.target.id === "resetBtn"){
+
+    socket.emit(
+      "fullReset",
+      "room1"
+    );
+
+    return;
+  }
+
+  if (e.target.id === "ghouliesBtn"){
+
+    socket.emit("callGhoulies");
+
+    return;
+  }
+
+  if (e.target.closest("#deck")){
 
     socket.emit("draw");
 
     return;
   }
 
-  /* TAKE DISCARD OR DISCARD PENDING */
   if (e.target.closest("#discard")){
 
     if (me()?.pending){
@@ -370,7 +311,6 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* NORMAL SWAP */
   if (
     e.target.dataset.card &&
     me()?.pending
@@ -380,42 +320,10 @@ document.addEventListener("click", e => {
       "swap",
       e.target.dataset.card
     );
-
-    return;
-  }
-
-  /* GHOULIES */
-  if (e.target.id === "ghouliesBtn"){
-
-    socket.emit("callGhoulies");
-
-    return;
-  }
-
-  /* RESTART */
-  if (e.target.id === "restartBtn"){
-
-    socket.emit("restart", "room1");
-
-    return;
-  }
-
-  /* FULL RESET */
-  if (e.target.id === "resetBtn"){
-
-    socket.emit(
-      "fullReset",
-      "room1"
-    );
-
-    return;
   }
 });
 
-/* SNAP */
 document.addEventListener("dblclick", e => {
-
-  if (!memoryDone) return;
 
   const c =
     e.target.dataset.card;
