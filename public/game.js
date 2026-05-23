@@ -48,22 +48,15 @@ function areaForPlayer(playerId){
   if (playerId === myId){
 
     return {
-
-      hand:
-        document.getElementById("hand"),
-
-      pending:
-        document.getElementById("pending")
+      hand: document.getElementById("hand"),
+      pending: document.getElementById("pending")
     };
   }
 
+  // 👇 opponent now animates to hidden zone instead of hand
   return {
-
-    hand:
-      document.getElementById("opponentHand"),
-
-    pending:
-      document.getElementById("opponentHand")
+    hand: document.getElementById("opponentHand"),
+    pending: document.getElementById("opponentPending")
   };
 }
 
@@ -179,6 +172,19 @@ function pulseCard(selector){
 
   },700);
 }
+function highlightCard(el, color="#00ff88"){
+
+  if (!el) return;
+
+  el.style.outline = `4px solid ${color}`;
+  el.style.transform = "scale(1.15)";
+  el.style.transition = "0.2s";
+
+  setTimeout(() => {
+    el.style.outline = "";
+    el.style.transform = "";
+  }, 800);
+}
 
 socket.on("state", g => {
 
@@ -238,28 +244,39 @@ socket.on("state", g => {
 
         break;
 
-      case "swap":
+case "swap":
 
-        showText(
-          "SWAP",
-          "#ffd000"
-        );
+  showText("SWAP", "#ffd000");
 
-        animateCard(
-          actor.pending,
-          actor.hand,
-          "/cards/back.png"
-        );
+  const handSelector =
+    g.effect.player === myId
+      ? `#hand img[data-index="${g.effect.handIndex}"]`
+      : `#opponentHand img[data-oppindex="${g.effect.handIndex}"]`;
 
-        setTimeout(() => {
+  const handEl = document.querySelector(handSelector);
 
-          animateCard(
-            actor.hand,
-            document.getElementById("discard"),
-            "/cards/back.png"
-          );
+  // 🔥 highlight target slot FIRST
+  highlightCard(handEl, "#ffd000");
 
-        },250);
+  // 🔥 animate incoming card → slot
+  animateCard(
+    actor.pending,
+    handEl,
+    "/cards/back.png"
+  );
+
+  // 🔥 animate outgoing card → discard
+  setTimeout(() => {
+
+    animateCard(
+      handEl,
+      document.getElementById("discard"),
+      "/cards/back.png"
+    );
+
+  }, 200);
+
+  break;
 
         setTimeout(() => {
 
@@ -312,74 +329,50 @@ socket.on("state", g => {
 
         break;
 
-      case "tenSwap":
+case "tenSwap":
 
-        showText(
-          "SPECIAL 10",
-          "gold"
-        );
+  showText("SPECIAL 10", "gold");
 
-        const mine =
-          g.effect.player === myId;
+  const mine =
+    g.effect.player === myId;
 
-        const ownSelector =
-          mine
-            ? `#hand img[data-index="${g.effect.ownIndex}"]`
-            : `#opponentHand img[data-oppindex="${g.effect.ownIndex}"]`;
+  const ownSelector =
+    mine
+      ? `#hand img[data-index="${g.effect.ownIndex}"]`
+      : `#opponentHand img[data-oppindex="${g.effect.ownIndex}"]`;
 
-        const oppSelector =
-          mine
-            ? `#opponentHand img[data-oppindex="${g.effect.oppIndex}"]`
-            : `#hand img[data-index="${g.effect.oppIndex}"]`;
+  const oppSelector =
+    mine
+      ? `#opponentHand img[data-oppindex="${g.effect.oppIndex}"]`
+      : `#hand img[data-index="${g.effect.oppIndex}"]`;
 
-        pulseCard(ownSelector);
+  const ownEl = document.querySelector(ownSelector);
+  const oppEl = document.querySelector(oppSelector);
 
-        pulseCard(oppSelector);
+  // 🔥 highlight BOTH cards clearly
+  highlightCard(ownEl, "#00ffcc"); // yours
+  highlightCard(oppEl, "#ff00ff"); // theirs
 
-        const ownEl =
-          document.querySelector(
-            ownSelector
-          );
+  // 🔥 delay so players SEE selection first
+  setTimeout(() => {
 
-        const oppEl =
-          document.querySelector(
-            oppSelector
-          );
+    animateCard(
+      ownEl,
+      oppEl,
+      "/cards/back.png"
+    );
 
-        animateCard(
-          ownEl,
-          oppEl,
-          "/cards/back.png"
-        );
+    animateCard(
+      oppEl,
+      ownEl,
+      "/cards/back.png"
+    );
 
-        animateCard(
-          oppEl,
-          ownEl,
-          "/cards/back.png"
-        );
+  }, 200);
 
-        break;
+  break;
 
-      case "ghoulies":
-
-        showText(
-          "GHOULIES!",
-          "#ff0000"
-        );
-
-        document.body.classList.add(
-          "ghouliesFlash"
-        );
-
-        setTimeout(() => {
-
-          document.body.classList.remove(
-            "ghouliesFlash"
-          );
-
-        },500);
-
-        break;
+  break;
     }
   }
 
