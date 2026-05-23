@@ -1,3 +1,5 @@
+// game.js
+
 let socket = io({
   reconnection:true,
   reconnectionAttempts:99999,
@@ -12,30 +14,6 @@ let memoryDone = false;
 
 let shownRoundPopup = false;
 
-/* SOUNDS */
-const sounds = {
-  draw:new Audio("/sounds/draw.mp3"),
-  discard:new Audio("/sounds/discard.mp3"),
-  snap:new Audio("/sounds/snap.mp3"),
-  ghoulies:new Audio("/sounds/ghoulies.mp3"),
-  swap:new Audio("/sounds/swap.mp3")
-};
-
-function play(name){
-
-  if (!sounds[name]) return;
-
-  sounds[name].currentTime = 0;
-  sounds[name].play();
-}
-
-function vibrate(ms=100){
-
-  if (navigator.vibrate){
-    navigator.vibrate(ms);
-  }
-}
-
 function connectToRoom(){
 
   socket.emit("join", "room1");
@@ -43,7 +21,6 @@ function connectToRoom(){
 
 connectToRoom();
 
-/* RECONNECT */
 socket.on("connect", () => {
 
   connectToRoom();
@@ -53,28 +30,140 @@ socket.on("you", id => {
   myId = id;
 });
 
+function centerOf(el){
+
+  const r =
+    el.getBoundingClientRect();
+
+  return {
+    x:r.left + r.width/2,
+    y:r.top + r.height/2
+  };
+}
+
+function animateCard(fromEl,toEl,image){
+
+  if (!fromEl || !toEl || !image) return;
+
+  const fx =
+    document.getElementById("fxLayer");
+
+  const start =
+    centerOf(fromEl);
+
+  const end =
+    centerOf(toEl);
+
+  const img =
+    document.createElement("img");
+
+  img.src = image;
+
+  img.className = "flyingCard";
+
+  img.style.left = start.x + "px";
+  img.style.top = start.y + "px";
+
+  fx.appendChild(img);
+
+  requestAnimationFrame(() => {
+
+    img.style.left = end.x + "px";
+    img.style.top = end.y + "px";
+
+    img.style.transform =
+      "rotate(12deg)";
+  });
+
+  setTimeout(() => {
+    img.remove();
+  },600);
+}
+
+function showText(text,color="#fff"){
+
+  const fx =
+    document.getElementById("fxLayer");
+
+  const div =
+    document.createElement("div");
+
+  div.className = "effectText";
+
+  div.style.color = color;
+
+  div.innerText = text;
+
+  fx.appendChild(div);
+
+  setTimeout(() => {
+    div.remove();
+  },1000);
+}
+
 socket.on("state", g => {
 
-  /* EFFECTS */
   if (g.effect){
 
     switch(g.effect.type){
 
       case "drawDeck":
-        play("draw");
+
+        showText("DRAW", "#00d0ff");
+
+        animateCard(
+          document.getElementById("deck"),
+          document.getElementById("pending"),
+          "/cards/back.png"
+        );
+
+        break;
+
+      case "takeDiscard":
+
+        showText("TAKE", "#00ff88");
+
+        animateCard(
+          document.getElementById("discard"),
+          document.getElementById("pending"),
+          document
+            .querySelector("#discard img")
+            ?.src
+        );
+
         break;
 
       case "discard":
-        play("discard");
+
+        showText("DISCARD", "#ff4444");
+
+        animateCard(
+          document.getElementById("pending"),
+          document.getElementById("discard"),
+          document
+            .querySelector("#pending img")
+            ?.src
+        );
+
         break;
 
       case "swap":
-        play("swap");
+
+        showText("SWAP", "#ffd000");
+
+        animateCard(
+          document.getElementById("pending"),
+          document.getElementById("discard"),
+          document
+            .querySelector("#pending img")
+            ?.src
+        );
+
         break;
 
       case "snapSuccess":
-        play("snap");
-        vibrate(150);
+
+        showText("SNAP!", "#00ff88");
 
         document.body.classList.add("snapFlash");
 
@@ -84,9 +173,21 @@ socket.on("state", g => {
 
         break;
 
+      case "snapFail":
+
+        showText("MISS!", "#ff0000");
+
+        break;
+
+      case "tenSwap":
+
+        showText("SPECIAL 10", "gold");
+
+        break;
+
       case "ghoulies":
-        play("ghoulies");
-        vibrate(400);
+
+        showText("GHOULIES!", "#ff0000");
 
         document.body.classList.add("ghouliesFlash");
 
@@ -100,7 +201,6 @@ socket.on("state", g => {
 
   state = g;
 
-  /* ROUND POPUP */
   if (
     state.roundResult &&
     !shownRoundPopup
@@ -132,7 +232,6 @@ ${state.scores[myId]}`
   render();
 });
 
-/* FORCE RESET */
 socket.on("forceReload", () => {
 
   location.reload();
@@ -198,7 +297,6 @@ function render(){
   const turn =
     state.order[state.turn] === myId;
 
-  /* TURN GLOW */
   document
     .getElementById("hand")
     .classList.toggle(
@@ -255,7 +353,6 @@ You: ${state.scores?.[myId] || 0}
 Opponent: ${state.scores?.[oppId()] || 0}
 `;
 
-  /* YOUR HAND */
   document.getElementById("hand").innerHTML =
     p?.hand?.map((c,i) => {
 
@@ -277,7 +374,6 @@ Opponent: ${state.scores?.[oppId()] || 0}
       `;
     }).join("") || "";
 
-  /* OPPONENT */
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
@@ -295,7 +391,6 @@ Opponent: ${state.scores?.[oppId()] || 0}
       `;
     }).join("") || "";
 
-  /* DISCARD */
   const top = state.discard?.at(-1);
 
   document.getElementById("discard").innerHTML =
@@ -303,7 +398,6 @@ Opponent: ${state.scores?.[oppId()] || 0}
       ? `<img class="card pop" src="${file(top)}">`
       : "";
 
-  /* PENDING */
   const pending = p?.pending;
 
   document.getElementById("pending").innerHTML =
@@ -339,12 +433,10 @@ Opponent: ${state.scores?.[oppId()] || 0}
       : "none";
 }
 
-/* CLICKS */
 document.addEventListener("click", e => {
 
   if (!state) return;
 
-  /* MEMORY */
   if (!memoryDone){
 
     if (e.target.dataset.index !== undefined){
@@ -485,7 +577,6 @@ document.addEventListener("click", e => {
   }
 });
 
-/* SNAP */
 document.addEventListener("dblclick", e => {
 
   if (!memoryDone) return;
