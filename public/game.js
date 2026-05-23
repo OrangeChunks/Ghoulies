@@ -181,7 +181,16 @@ function file(card){
 }
 
 function back(){
+  
   return "/cards/back.png";
+}
+
+function clickedDeck(el){
+
+  return (
+    el.id === "deck" ||
+    el.closest("#deck")
+  );
 }
 
 function render(){
@@ -420,14 +429,27 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* DRAW */
-  if (e.target.closest("#deck")){
+/* DRAW */
+if (clickedDeck(e.target)){
 
-    socket.emit("draw");
+  socket.emit("draw");
 
-    return;
+  const deck =
+    document.querySelector("#deck img");
+
+  if (deck){
+
+    deck.classList.add("flip");
+
+    setTimeout(() => {
+
+      deck.classList.remove("flip");
+
+    }, 600);
   }
 
+  return;
+}
   /* DISCARD */
   if (e.target.closest("#discard")){
 
