@@ -312,7 +312,15 @@ io.on("connection", socket => {
     const p = g.players[socket.id];
 
     if (p.pending) return;
+    
+if (g.deck.length <= 0){
 
+  finishRound(g);
+
+  io.to(roomId(socket)).emit("state", g);
+
+  return;
+}
     p.pending = g.deck.pop();
 
     g.effect = {

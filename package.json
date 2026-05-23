@@ -1,7 +1,11 @@
 {
   "name": "ghoulies",
   "version": "1.0.0",
+  "description": "Realtime multiplayer Ghoulies card game",
   "main": "server.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "node server.js"
   },
