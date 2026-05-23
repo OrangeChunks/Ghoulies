@@ -129,6 +129,26 @@ socket.on("state", g => {
         "";
 
     }, 2500);
+
+    /* DECK ANIMATION FOR BOTH PLAYERS */
+    if (
+      state.effect.type === "drawDeck"
+    ){
+
+      const deck =
+        document.querySelector("#deck img");
+
+      if (deck){
+
+        deck.classList.add("flip");
+
+        setTimeout(() => {
+
+          deck.classList.remove("flip");
+
+        }, 600);
+      }
+    }
   }
 
   render();
@@ -181,7 +201,6 @@ function file(card){
 }
 
 function back(){
-  
   return "/cards/back.png";
 }
 
@@ -233,7 +252,6 @@ function render(){
       turn ? "Your turn" : "Opponent's turn";
   }
 
-  /* CUSTOM MESSAGE */
   if (
     state.message &&
     state.message[myId]
@@ -298,7 +316,7 @@ function render(){
       ? `<img class="card" src="${file(top)}">`
       : "";
 
-  /* PENDING */
+  /* PENDING CARD */
   const pending = p?.pending;
 
   document.getElementById("pending").innerHTML =
@@ -429,27 +447,14 @@ document.addEventListener("click", e => {
     return;
   }
 
-/* DRAW */
-if (clickedDeck(e.target)){
+  /* DRAW */
+  if (clickedDeck(e.target)){
 
-  socket.emit("draw");
+    socket.emit("draw");
 
-  const deck =
-    document.querySelector("#deck img");
-
-  if (deck){
-
-    deck.classList.add("flip");
-
-    setTimeout(() => {
-
-      deck.classList.remove("flip");
-
-    }, 600);
+    return;
   }
 
-  return;
-}
   /* DISCARD */
   if (e.target.closest("#discard")){
 
@@ -475,6 +480,8 @@ if (clickedDeck(e.target)){
       "swap",
       e.target.dataset.card
     );
+
+    return;
   }
 });
 
