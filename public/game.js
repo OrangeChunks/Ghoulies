@@ -3,12 +3,14 @@ let socket = io();
 let state = null;
 let myId = null;
 
+/* MEMORY PHASE */
 let revealed = [];
 let memoryDone = false;
 
 let shownRoundPopup = false;
 
 function connectToRoom(){
+
   socket.emit("join", "room1");
 }
 
@@ -22,24 +24,7 @@ socket.on("state", g => {
 
   state = g;
 
-  /* WIN / LOSE */
-  if (state.gameOver){
-
-    if (state.losers.includes(myId)){
-
-      setTimeout(() => {
-        alert("YOU LOSE");
-      }, 300);
-
-    } else {
-
-      setTimeout(() => {
-        alert("YOU WIN");
-      }, 300);
-    }
-  }
-
-  /* ROUND RESULT */
+  /* ROUND POPUP */
   if (
     state.roundResult &&
     !shownRoundPopup
@@ -47,116 +32,44 @@ socket.on("state", g => {
 
     shownRoundPopup = true;
 
+    const myScore =
+      state.roundResult[myId];
+
     alert(
-      `Round Over!\n\nYou scored ${state.roundResult[myId]} points this round.`
+      `Round Over!\n\nYou scored ${myScore} points this round.`
     );
 
+    /* RESET MEMORY PHASE */
     memoryDone = false;
     revealed = [];
   }
 
+  /* RESET POPUP TRACKER */
   if (!state.roundResult){
     shownRoundPopup = false;
-  }
-
-  /* EFFECTS */
-  if (state.effect){
-
-    const isOpponent =
-      state.effect.player !== myId;
-
-    const effectText = {
-
-      drawDeck:
-        isOpponent
-          ? "Opponent drew from deck"
-          : "You drew from deck",
-
-      takeDiscard:
-        isOpponent
-          ? "Opponent took discard"
-          : "You took discard",
-
-      discard:
-        isOpponent
-          ? "Opponent discarded a card"
-          : "You discarded a card",
-
-      swap:
-        isOpponent
-          ? "Opponent swapped a card"
-          : "You swapped a card",
-
-      tenSwap:
-        isOpponent
-          ? "Opponent used special 10 swap"
-          : "You used special 10 swap",
-
-      noSwap:
-        isOpponent
-          ? "Opponent cancelled special 10 swap"
-          : "You cancelled special 10 swap",
-
-      ghoulies:
-        isOpponent
-          ? "Opponent called GHOULIES"
-          : "You called GHOULIES",
-
-      snapSuccess:
-        isOpponent
-          ? "Opponent snapped successfully"
-          : "Successful SNAP",
-
-      snapFail:
-        isOpponent
-          ? "Opponent failed SNAP and misses next turn"
-          : "Failed SNAP — you miss next turn",
-
-      skip:
-        isOpponent
-          ? "Opponent misses a turn"
-          : "You miss a turn"
-    };
-
-    document.getElementById("effect").innerText =
-      effectText[state.effect.type] || "";
-
-    clearTimeout(window.effectTimer);
-
-    window.effectTimer = setTimeout(() => {
-
-      document.getElementById("effect").innerText =
-        "";
-
-    }, 2500);
-
-    /* DECK ANIMATION FOR BOTH PLAYERS */
-    if (
-      state.effect.type === "drawDeck"
-    ){
-
-      const deck =
-        document.querySelector("#deck img");
-
-      if (deck){
-
-        deck.classList.add("flip");
-
-        setTimeout(() => {
-
-          deck.classList.remove("flip");
-
-        }, 600);
-      }
-    }
   }
 
   render();
 });
 
+/* FORCE FULL RESET */
 socket.on("forceReload", () => {
 
-  location.reload();
+  state = null;
+
+  revealed = [];
+  memoryDone = false;
+  shownRoundPopup = false;
+
+  socket.disconnect();
+
+  setTimeout(() => {
+
+    socket.connect();
+
+    connectToRoom();
+
+  }, 500);
 });
 
 function me(){
@@ -164,6 +77,7 @@ function me(){
 }
 
 function oppId(){
+
   return state?.order?.find(
     id => id !== myId
   );
@@ -205,11 +119,7 @@ function back(){
 }
 
 function clickedDeck(el){
-
-  return (
-    el.id === "deck" ||
-    el.closest("#deck")
-  );
+  return el.id === "deck" || el.closest("#deck");
 }
 
 function render(){
@@ -238,24 +148,26 @@ function render(){
     if (state.tenSwap.selectingOwn){
 
       statusText =
-        "Choose YOUR card to swap or press NO SWAP";
+        "Choose one of YOUR cards to swap or press NO SWAP";
 
     } else {
 
       statusText =
-        "Choose OPPONENT card to swap";
+        "Choose an OPPONENT card to swap";
     }
 
   } else {
 
     statusText =
-      turn ? "Your turn" : "Opponent's turn";
+      turn ? "Your turn" : "Their turn";
   }
 
+  /* SPECIAL MESSAGE */
   if (
     state.message &&
     state.message[myId]
   ){
+
     statusText =
       state.message[myId];
   }
@@ -263,7 +175,6 @@ function render(){
   document.getElementById("status").innerText =
     statusText;
 
-  /* SCORES */
   document.getElementById("scores").innerHTML =
     `You: ${state.scores?.[myId] || 0}
      | Opponent: ${state.scores?.[oppId()] || 0}`;
@@ -316,7 +227,7 @@ function render(){
       ? `<img class="card" src="${file(top)}">`
       : "";
 
-  /* PENDING CARD */
+  /* PENDING */
   const pending = p?.pending;
 
   document.getElementById("pending").innerHTML =
@@ -347,17 +258,25 @@ function render(){
     )
       ? "inline-block"
       : "none";
+
+  /* RESTART */
+  document.getElementById("restartBtn").style.display =
+    state.gameOver
+      ? "block"
+      : "none";
 }
 
+/* CLICK EVENTS */
 document.addEventListener("click", e => {
 
   if (!state) return;
 
-  /* MEMORY */
+  /* MEMORY PHASE */
   if (!memoryDone){
 
     if (e.target.dataset.index !== undefined){
 
+      /* HARD CAP AT 2 */
       if (revealed.length >= 2){
         return;
       }
@@ -396,7 +315,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* TEN OWN */
+  /* 10 OWN CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -412,7 +331,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* TEN OPP */
+  /* 10 OPP CARD */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -428,25 +347,6 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* RESET */
-  if (e.target.id === "resetBtn"){
-
-    socket.emit(
-      "fullReset",
-      "room1"
-    );
-
-    return;
-  }
-
-  /* GHOULIES */
-  if (e.target.id === "ghouliesBtn"){
-
-    socket.emit("callGhoulies");
-
-    return;
-  }
-
   /* DRAW */
   if (clickedDeck(e.target)){
 
@@ -455,7 +355,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* DISCARD */
+  /* TAKE DISCARD OR DISCARD PENDING */
   if (e.target.closest("#discard")){
 
     if (me()?.pending){
@@ -470,7 +370,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  /* SWAP */
+  /* NORMAL SWAP */
   if (
     e.target.dataset.card &&
     me()?.pending
@@ -483,10 +383,39 @@ document.addEventListener("click", e => {
 
     return;
   }
+
+  /* GHOULIES */
+  if (e.target.id === "ghouliesBtn"){
+
+    socket.emit("callGhoulies");
+
+    return;
+  }
+
+  /* RESTART */
+  if (e.target.id === "restartBtn"){
+
+    socket.emit("restart", "room1");
+
+    return;
+  }
+
+  /* FULL RESET */
+  if (e.target.id === "resetBtn"){
+
+    socket.emit(
+      "fullReset",
+      "room1"
+    );
+
+    return;
+  }
 });
 
 /* SNAP */
 document.addEventListener("dblclick", e => {
+
+  if (!memoryDone) return;
 
   const c =
     e.target.dataset.card;
