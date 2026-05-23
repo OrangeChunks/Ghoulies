@@ -22,24 +22,24 @@ socket.on("state", g => {
 
   state = g;
 
-  /* WIN/LOSE */
+  /* WIN / LOSE */
   if (state.gameOver){
 
     if (state.losers.includes(myId)){
 
       setTimeout(() => {
         alert("YOU LOSE");
-      }, 500);
+      }, 300);
 
     } else {
 
       setTimeout(() => {
         alert("YOU WIN");
-      }, 500);
+      }, 300);
     }
   }
 
-  /* ROUND */
+  /* ROUND RESULT */
   if (
     state.roundResult &&
     !shownRoundPopup
@@ -60,28 +60,70 @@ socket.on("state", g => {
   }
 
   /* EFFECTS */
-  if (
-    state.effect &&
-    state.effect.player !== myId
-  ){
+  if (state.effect){
 
-    const effects = {
-      drawDeck:"Opponent drew from deck",
-      takeDiscard:"Opponent took discard",
-      discard:"Opponent discarded a card",
-      swap:"Opponent swapped a card",
-      tenSwap:"Opponent used special 10 swap",
-      noSwap:"Opponent cancelled special 10 swap",
-      ghoulies:"Opponent called GHOULIES",
-      snapSuccess:"Opponent snapped successfully",
-      snapFail:"Opponent failed a snap and misses next turn",
-      skip:"Opponent loses a turn"
+    const isOpponent =
+      state.effect.player !== myId;
+
+    const effectText = {
+
+      drawDeck:
+        isOpponent
+          ? "Opponent drew from deck"
+          : "You drew from deck",
+
+      takeDiscard:
+        isOpponent
+          ? "Opponent took discard"
+          : "You took discard",
+
+      discard:
+        isOpponent
+          ? "Opponent discarded a card"
+          : "You discarded a card",
+
+      swap:
+        isOpponent
+          ? "Opponent swapped a card"
+          : "You swapped a card",
+
+      tenSwap:
+        isOpponent
+          ? "Opponent used special 10 swap"
+          : "You used special 10 swap",
+
+      noSwap:
+        isOpponent
+          ? "Opponent cancelled special 10 swap"
+          : "You cancelled special 10 swap",
+
+      ghoulies:
+        isOpponent
+          ? "Opponent called GHOULIES"
+          : "You called GHOULIES",
+
+      snapSuccess:
+        isOpponent
+          ? "Opponent snapped successfully"
+          : "Successful SNAP",
+
+      snapFail:
+        isOpponent
+          ? "Opponent failed SNAP and misses next turn"
+          : "Failed SNAP — you miss next turn",
+
+      skip:
+        isOpponent
+          ? "Opponent misses a turn"
+          : "You miss a turn"
     };
 
     document.getElementById("effect").innerText =
-      effects[state.effect.type] || "";
+      effectText[state.effect.type] || "";
 
-    setTimeout(() => {
+    clearTimeout(window.effectTimer);
+
+    window.effectTimer = setTimeout(() => {
 
       document.getElementById("effect").innerText =
         "";
@@ -149,19 +191,71 @@ function render(){
   const p = me();
   const o = state.players?.[oppId()];
 
+  const turn =
+    state.order[state.turn] === myId;
+
+  /* STATUS */
+  let statusText = "";
+
+  if (!memoryDone){
+
+    statusText =
+      `Choose 2 cards to memorise (${revealed.length}/2)`;
+
+  } else if (
+    state.tenSwap &&
+    state.tenSwap.player === myId
+  ){
+
+    if (state.tenSwap.selectingOwn){
+
+      statusText =
+        "Choose YOUR card to swap or press NO SWAP";
+
+    } else {
+
+      statusText =
+        "Choose OPPONENT card to swap";
+    }
+
+  } else {
+
+    statusText =
+      turn ? "Your turn" : "Opponent's turn";
+  }
+
+  /* CUSTOM MESSAGE */
+  if (
+    state.message &&
+    state.message[myId]
+  ){
+    statusText =
+      state.message[myId];
+  }
+
+  document.getElementById("status").innerText =
+    statusText;
+
+  /* SCORES */
   document.getElementById("scores").innerHTML =
     `You: ${state.scores?.[myId] || 0}
      | Opponent: ${state.scores?.[oppId()] || 0}`;
 
+  /* YOUR HAND */
   document.getElementById("hand").innerHTML =
     p?.hand?.map((c,i) => {
 
       const visible =
         revealed.includes(i);
 
+      const tenGlow =
+        state.tenSwap &&
+        state.tenSwap.player === myId &&
+        state.tenSwap.selectingOwn;
+
       return `
         <img
-          class="card"
+          class="card ${tenGlow ? "tenGlow" : ""}"
           data-card="${c}"
           data-index="${i}"
           src="${visible ? file(c) : back()}"
@@ -169,18 +263,25 @@ function render(){
       `;
     }).join("") || "";
 
+  /* OPPONENT HAND */
   document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
+      const tenGlow =
+        state.tenSwap &&
+        state.tenSwap.player === myId &&
+        !state.tenSwap.selectingOwn;
+
       return `
         <img
-          class="card"
+          class="card ${tenGlow ? "tenGlow" : ""}"
           data-oppindex="${i}"
           src="${back()}"
         >
       `;
     }).join("") || "";
 
+  /* DISCARD */
   const top = state.discard?.at(-1);
 
   document.getElementById("discard").innerHTML =
@@ -188,6 +289,29 @@ function render(){
       ? `<img class="card" src="${file(top)}">`
       : "";
 
+  /* PENDING */
+  const pending = p?.pending;
+
+  document.getElementById("pending").innerHTML =
+    pending && turn
+      ? `
+        <div style="margin-top:10px">
+
+          <div style="margin-bottom:6px">
+            You picked up:
+          </div>
+
+          <img
+            class="card flip"
+            src="${file(pending)}"
+            style="width:80px"
+          >
+
+        </div>
+      `
+      : "";
+
+  /* NO SWAP BUTTON */
   document.getElementById("noSwapBtn").style.display =
     (
       state.tenSwap &&
@@ -202,6 +326,7 @@ document.addEventListener("click", e => {
 
   if (!state) return;
 
+  /* MEMORY */
   if (!memoryDone){
 
     if (e.target.dataset.index !== undefined){
@@ -236,6 +361,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* NO SWAP */
   if (e.target.id === "noSwapBtn"){
 
     socket.emit("tenOwn", null);
@@ -243,6 +369,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* TEN OWN */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -258,6 +385,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* TEN OPP */
   if (
     state.tenSwap &&
     state.tenSwap.player === myId &&
@@ -273,6 +401,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* RESET */
   if (e.target.id === "resetBtn"){
 
     socket.emit(
@@ -283,6 +412,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* GHOULIES */
   if (e.target.id === "ghouliesBtn"){
 
     socket.emit("callGhoulies");
@@ -290,6 +420,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* DRAW */
   if (e.target.closest("#deck")){
 
     socket.emit("draw");
@@ -297,6 +428,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* DISCARD */
   if (e.target.closest("#discard")){
 
     if (me()?.pending){
@@ -311,6 +443,7 @@ document.addEventListener("click", e => {
     return;
   }
 
+  /* SWAP */
   if (
     e.target.dataset.card &&
     me()?.pending
@@ -323,6 +456,7 @@ document.addEventListener("click", e => {
   }
 });
 
+/* SNAP */
 document.addEventListener("dblclick", e => {
 
   const c =
