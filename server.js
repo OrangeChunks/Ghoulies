@@ -152,7 +152,7 @@ io.on("connection", socket => {
 
       g.players[socket.id] = {
 
-        hand:g.deck.splice(0,4),
+        hand:g.deck.splice(0,5),
 
         pending:null
       };
@@ -285,7 +285,7 @@ io.on("connection", socket => {
 
         g.players[id] = {
 
-          hand:deck.splice(0,4),
+          hand:deck.splice(0,5),
 
           pending:null
         };

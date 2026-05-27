@@ -1,5 +1,3 @@
-// game.js
-
 let socket = io({
   reconnection:true,
   reconnectionAttempts:99999,
@@ -53,7 +51,6 @@ function areaForPlayer(playerId){
     };
   }
 
-  // 👇 opponent now animates to hidden zone instead of hand
   return {
     hand: document.getElementById("opponentHand"),
     pending: document.getElementById("opponentPending")
@@ -172,7 +169,9 @@ function pulseCard(selector){
 
   },700);
 }
+
 function highlightCard(el, color="#00ff88"){
+
   if (!el) return;
 
   el.style.outline = `5px solid ${color}`;
@@ -182,10 +181,12 @@ function highlightCard(el, color="#00ff88"){
   el.style.transition = "0.15s";
 
   setTimeout(() => {
+
     el.style.outline = "";
     el.style.boxShadow = "";
     el.style.transform = "";
     el.style.zIndex = "";
+
   }, 900);
 }
 
@@ -247,74 +248,56 @@ socket.on("state", g => {
 
         break;
 
-case "swap":
+      case "swap": {
 
-handEl.classList.add("swapping");
+        showText(
+          "SWAP",
+          "#ffd000"
+        );
 
-setTimeout(()=>{
-  handEl.classList.remove("swapping");
-},400);
+        const handSelector =
+          g.effect.player === myId
+            ? `#hand img[data-index="${g.effect.handIndex}"]`
+            : `#opponentHand img[data-oppindex="${g.effect.handIndex}"]`;
 
-  showText("SWAP", "#ffd000");
+        const handEl =
+          document.querySelector(handSelector);
 
-  const handSelector =
-    g.effect.player === myId
-      ? `#hand img[data-index="${g.effect.handIndex}"]`
-      : `#opponentHand img[data-oppindex="${g.effect.handIndex}"]`;
+        if (handEl){
 
-  const handEl = document.querySelector(handSelector);
+          handEl.classList.add("swapping");
 
-  // 🔥 highlight target slot FIRST
- highlightCard(handEl,"#ffd000");
+          setTimeout(() => {
 
-// ⬇️ ADD THIS DELAY
-setTimeout(()=>{
+            handEl.classList.remove("swapping");
 
-  animateCard(actor.pending, handEl, "/cards/back.png");
+          },400);
 
-  setTimeout(()=>{
-    animateCard(
-      handEl,
-      document.getElementById("discard"),
-      "/cards/back.png"
-    );
-  },150);
+          highlightCard(handEl,"#ffd000");
 
-},200);
+          setTimeout(() => {
 
-  // 🔥 animate outgoing card → discard
-  setTimeout(() => {
-
-    animateCard(
-      handEl,
-      document.getElementById("discard"),
-      "/cards/back.png"
-    );
-
-  }, 200);
-
-  break;
-
-        setTimeout(() => {
-
-          if (
-            g.effect.player === myId
-          ){
-
-            pulseCard(
-              `#hand img[data-index="${g.effect.handIndex}"]`
+            animateCard(
+              actor.pending,
+              handEl,
+              "/cards/back.png"
             );
 
-          } else {
+            setTimeout(() => {
 
-            pulseCard(
-              `#opponentHand img[data-oppindex="${g.effect.handIndex}"]`
-            );
-          }
+              animateCard(
+                handEl,
+                document.getElementById("discard"),
+                "/cards/back.png"
+              );
 
-        },300);
+            },150);
+
+          },200);
+        }
 
         break;
+      }
 
       case "snapSuccess":
 
@@ -346,64 +329,66 @@ setTimeout(()=>{
 
         break;
 
-case "tenSwap":
+      case "tenSwap": {
 
-ownEl.classList.add("swapping");
-oppEl.classList.add("swapping");
+        showText(
+          "SPECIAL 10",
+          "gold"
+        );
 
-setTimeout(()=>{
-  ownEl.classList.remove("swapping");
-  oppEl.classList.remove("swapping");
-},400);
+        const mine =
+          g.effect.player === myId;
 
-  showText("SPECIAL 10", "gold");
+        const ownSelector =
+          mine
+            ? `#hand img[data-index="${g.effect.ownIndex}"]`
+            : `#opponentHand img[data-oppindex="${g.effect.ownIndex}"]`;
 
-  const mine =
-    g.effect.player === myId;
+        const oppSelector =
+          mine
+            ? `#opponentHand img[data-oppindex="${g.effect.oppIndex}"]`
+            : `#hand img[data-index="${g.effect.oppIndex}"]`;
 
-  const ownSelector =
-    mine
-      ? `#hand img[data-index="${g.effect.ownIndex}"]`
-      : `#opponentHand img[data-oppindex="${g.effect.ownIndex}"]`;
+        const ownEl =
+          document.querySelector(ownSelector);
 
-  const oppSelector =
-    mine
-      ? `#opponentHand img[data-oppindex="${g.effect.oppIndex}"]`
-      : `#hand img[data-index="${g.effect.oppIndex}"]`;
+        const oppEl =
+          document.querySelector(oppSelector);
 
-  const ownEl = document.querySelector(ownSelector);
-  const oppEl = document.querySelector(oppSelector);
-highlightCard(ownEl,"#00ffcc");
-highlightCard(oppEl,"#ff00ff");
+        if (ownEl && oppEl){
 
-// ⬇️ ADD DELAY HERE
-setTimeout(()=>{
+          ownEl.classList.add("swapping");
+          oppEl.classList.add("swapping");
 
-  animateCard(ownEl, oppEl, "/cards/back.png");
-  animateCard(oppEl, ownEl, "/cards/back.png");
+          setTimeout(() => {
 
-},250);
+            ownEl.classList.remove("swapping");
+            oppEl.classList.remove("swapping");
 
-  // 🔥 delay so players SEE selection first
-  setTimeout(() => {
+          },400);
 
-    animateCard(
-      ownEl,
-      oppEl,
-      "/cards/back.png"
-    );
+          highlightCard(ownEl,"#00ffcc");
+          highlightCard(oppEl,"#ff00ff");
 
-    animateCard(
-      oppEl,
-      ownEl,
-      "/cards/back.png"
-    );
+          setTimeout(() => {
 
-  }, 200);
+            animateCard(
+              ownEl,
+              oppEl,
+              "/cards/back.png"
+            );
 
-  break;
+            animateCard(
+              oppEl,
+              ownEl,
+              "/cards/back.png"
+            );
 
-  break;
+          },250);
+        }
+
+        break;
+      }
     }
   }
 
