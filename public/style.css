@@ -1,11 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ghoulies</title>
-
-<style>
-
 body{
   margin:0;
   background:#111;
@@ -24,7 +16,6 @@ body{
   margin-bottom:10px;
 }
 
-/* ROWS */
 .row{
   display:flex;
   justify-content:center;
@@ -34,39 +25,29 @@ body{
   margin:16px;
 }
 
-/* HANDS */
-#hand,
-#opponentHand{
+#hand,#opponentHand{
   display:flex;
   justify-content:center;
-  align-items:center;
   flex-wrap:wrap;
   gap:10px;
   min-height:120px;
-  width:100%;
-  padding:10px;
 }
 
-/* CARDS */
 .card{
   width:70px;
   transition:0.2s;
   cursor:pointer;
-  user-select:none;
 }
 
-.card.swapping {
-  opacity: 0.25;
-  transition: 0.2s;
+.card.swapping{
+  opacity:0.25;
 }
 
 .card:hover{
   transform:scale(1.08);
 }
 
-/* DECKS */
-#deck,
-#discard{
+#deck,#discard{
   width:85px;
   height:110px;
   border:2px solid white;
@@ -74,96 +55,34 @@ body{
   align-items:center;
   justify-content:center;
   background:#222;
-  cursor:pointer;
   border-radius:8px;
-  overflow:hidden;
 }
 
-#deck img,
-#discard img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
+#fxLayer{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
 }
 
-/* BUTTONS */
-button{
-  padding:10px 16px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-  font-size:16px;
+.flyingCard{
+  position:absolute;
+  width:80px;
+  transition:0.5s ease;
+  z-index:999;
 }
 
-#restartBtn{
-  display:none;
+.effectText{
+  position:absolute;
+  top:40%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  font-size:32px;
+  font-weight:bold;
+  animation:popFade 1s forwards;
 }
 
-/* MOBILE */
-@media(max-width:600px){
-
-  .card{
-    width:55px;
-  }
-
-  #deck,
-  #discard{
-    width:70px;
-    height:95px;
-  }
-
-  #hand,
-  #opponentHand{
-    gap:6px;
-  }
+@keyframes popFade{
+  0%{opacity:0; transform:translate(-50%,-60%) scale(0.5);}
+  50%{opacity:1; transform:translate(-50%,-50%) scale(1.2);}
+  100%{opacity:0; transform:translate(-50%,-40%) scale(1);}
 }
-
-</style>
-</head>
-
-<body>
-
-<div id="status"></div>
-
-<div id="scores"></div>
-
-<button id="restartBtn">
-  Play Again
-</button>
-
-<!-- OPPONENT -->
-<div id="opponentHand"></div>
-
-<!-- CENTER -->
-<div class="row">
-
-  <!-- FIXED DECK GRAPHIC -->
-  <div id="deck">
-    <img
-      src="/cards/back.png"
-      alt="Deck"
-    >
-  </div>
-
-  <div id="discard"></div>
-
-</div>
-
-<!-- PLAYER -->
-<div id="hand"></div>
-
-<!-- PENDING -->
-<div id="pending"></div>
-
-<!-- ACTIONS -->
-<div class="row">
-  <button id="ghouliesBtn">
-    Call Ghoulies
-  </button>
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script src="game.js"></script>
-
-</body>
-</html>
