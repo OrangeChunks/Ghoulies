@@ -1,5 +1,3 @@
-// server.js
-
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -152,7 +150,7 @@ io.on("connection", socket => {
 
       g.players[socket.id] = {
 
-        hand:g.deck.splice(0,5),
+        hand:g.deck.splice(0,4),
 
         pending:null
       };
@@ -285,7 +283,7 @@ io.on("connection", socket => {
 
         g.players[id] = {
 
-          hand:deck.splice(0,5),
+          hand:deck.splice(0,4),
 
           pending:null
         };

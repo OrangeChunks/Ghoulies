@@ -588,13 +588,31 @@ Opponent: ${state.scores?.[oppId()] || 0}
         state.tenSwap.player === myId &&
         state.tenSwap.selectingOwn;
 
+      const recentlySwapped =
+        state.effect &&
+        state.effect.type === "tenSwap" &&
+        (
+          i === state.effect.ownIndex ||
+          i === state.effect.oppIndex
+        );
+
       return `
-        <img
-          class="card ${tenGlow ? "tenGlow" : ""}"
-          data-card="${c}"
-          data-index="${i}"
-          src="${visible ? file(c) : back()}"
-        >
+        <div class="cardWrap">
+
+          ${
+            recentlySwapped
+              ? `<div class="swapMarker">⇄</div>`
+              : ""
+          }
+
+          <img
+            class="card ${tenGlow ? "tenGlow" : ""}"
+            data-card="${c}"
+            data-index="${i}"
+            src="${visible ? file(c) : back()}"
+          >
+
+        </div>
       `;
     }).join("") || "";
 
@@ -609,12 +627,30 @@ Opponent: ${state.scores?.[oppId()] || 0}
         state.tenSwap.player === myId &&
         !state.tenSwap.selectingOwn;
 
+      const recentlySwapped =
+        state.effect &&
+        state.effect.type === "tenSwap" &&
+        (
+          i === state.effect.ownIndex ||
+          i === state.effect.oppIndex
+        );
+
       return `
-        <img
-          class="card ${tenGlow ? "tenGlow" : ""}"
-          data-oppindex="${i}"
-          src="${back()}"
-        >
+        <div class="cardWrap">
+
+          ${
+            recentlySwapped
+              ? `<div class="swapMarker">⇄</div>`
+              : ""
+          }
+
+          <img
+            class="card ${tenGlow ? "tenGlow" : ""}"
+            data-oppindex="${i}"
+            src="${back()}"
+          >
+
+        </div>
       `;
     }).join("") || "";
 
