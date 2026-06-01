@@ -1,169 +1,266 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ghoulies</title>
-
-<style>
-
 body{
-  margin:0;
-  background:#111;
-  color:white;
-  text-align:center;
-  font-family:Arial;
+margin:0;
+background:#111;
+color:white;
+text-align:center;
+font-family:Arial;
+overflow-x:hidden;
 }
 
 #status{
-  padding:10px;
-  font-size:20px;
-  font-weight:bold;
+padding:10px;
+font-size:20px;
+font-weight:bold;
 }
 
 #scores{
-  margin-bottom:10px;
+margin-bottom:10px;
 }
 
-/* ROWS */
 .row{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:18px;
-  flex-wrap:wrap;
-  margin:16px;
+display:flex;
+justify-content:center;
+align-items:center;
+gap:18px;
+flex-wrap:wrap;
+margin:16px;
 }
 
-/* HANDS */
 #hand,
 #opponentHand{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:10px;
-  min-height:120px;
-  width:100%;
-  padding:10px;
+display:flex;
+justify-content:center;
+align-items:center;
+flex-wrap:wrap;
+gap:10px;
+min-height:120px;
+width:100%;
+padding:10px;
 }
 
-/* CARDS */
 .card{
-  width:70px;
-  transition:0.2s;
-  cursor:pointer;
-  user-select:none;
-}
-
-.card.swapping {
-  opacity: 0.25;
-  transition: 0.2s;
+width:70px;
+transition:0.2s;
+cursor:pointer;
+user-select:none;
 }
 
 .card:hover{
-  transform:scale(1.08);
+transform:scale(1.08);
 }
 
-/* DECKS */
+.cardWrap{
+position:relative;
+display:inline-block;
+}
+
+.swapMarker{
+position:absolute;
+top:-10px;
+right:-10px;
+width:34px;
+height:34px;
+border-radius:50%;
+background:linear-gradient(135deg,#ffd700,#ffae00);
+color:black;
+font-weight:bold;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:20px;
+box-shadow:
+0 0 12px #ffd700,
+0 0 25px #ffae00;
+animation:swapPulse 1s infinite alternate;
+z-index:100;
+}
+
+@keyframes swapPulse{
+from{
+transform:scale(1);
+}
+
+to{
+transform:scale(1.15);
+}
+}
+
+.card.swapping{
+animation:swapFlash 1s ease;
+}
+
+@keyframes swapFlash{
+
+0%{
+transform:scale(1);
+filter:brightness(1);
+}
+
+50%{
+transform:scale(1.2);
+filter:brightness(2);
+}
+
+100%{
+transform:scale(1);
+filter:brightness(1);
+}
+}
+
 #deck,
 #discard{
-  width:85px;
-  height:110px;
-  border:2px solid white;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#222;
-  cursor:pointer;
-  border-radius:8px;
-  overflow:hidden;
+width:85px;
+height:110px;
+border:2px solid white;
+display:flex;
+align-items:center;
+justify-content:center;
+background:#222;
+cursor:pointer;
+border-radius:8px;
+overflow:hidden;
 }
 
 #deck img,
 #discard img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
+width:100%;
+height:100%;
+object-fit:cover;
 }
 
-/* BUTTONS */
 button{
-  padding:10px 16px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-  font-size:16px;
+padding:10px 16px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+font-size:16px;
 }
 
 #restartBtn{
-  display:none;
+display:none;
 }
 
-/* MOBILE */
+#fxLayer{
+position:fixed;
+inset:0;
+pointer-events:none;
+overflow:hidden;
+z-index:9999;
+}
+
+.flyingCard{
+position:fixed;
+width:70px;
+transform:translate(-50%,-50%);
+
+transition:
+left 1s cubic-bezier(.22,.61,.36,1),
+top 1s cubic-bezier(.22,.61,.36,1),
+transform 1s cubic-bezier(.22,.61,.36,1);
+
+filter:
+drop-shadow(0 0 10px gold)
+drop-shadow(0 0 20px gold);
+}
+
+.effectText{
+position:fixed;
+top:45%;
+left:50%;
+transform:translate(-50%,-50%);
+font-size:48px;
+font-weight:bold;
+text-shadow:0 0 20px currentColor;
+animation:effectPop 1s forwards;
+}
+
+@keyframes effectPop{
+
+0%{
+opacity:0;
+transform:translate(-50%,-50%) scale(0.5);
+}
+
+20%{
+opacity:1;
+transform:translate(-50%,-50%) scale(1.2);
+}
+
+100%{
+opacity:0;
+transform:translate(-50%,-50%) scale(1);
+}
+}
+
+.deckShake{
+animation:deckShake 0.3s;
+}
+
+@keyframes deckShake{
+
+0%{ transform:translateX(0); }
+25%{ transform:translateX(-5px); }
+50%{ transform:translateX(5px); }
+75%{ transform:translateX(-5px); }
+100%{ transform:translateX(0); }
+}
+
+.snapFlash{
+animation:snapFlash 0.2s;
+}
+
+@keyframes snapFlash{
+
+from{
+background:#00ff88;
+}
+
+to{
+background:#111;
+}
+}
+
+.activeTurn{
+box-shadow:0 0 30px #00ff88;
+border-radius:12px;
+}
+
+.tenGlow{
+box-shadow:0 0 20px gold;
+}
+
+#pending,
+#opponentPending{
+min-height:140px;
+margin-top:10px;
+}
+
+.bigCard{
+width:90px;
+}
+
 @media(max-width:600px){
 
-  .card{
-    width:55px;
-  }
-
-  #deck,
-  #discard{
-    width:70px;
-    height:95px;
-  }
-
-  #hand,
-  #opponentHand{
-    gap:6px;
-  }
+.card{
+width:55px;
 }
 
-</style>
-</head>
+#deck,
+#discard{
+width:70px;
+height:95px;
+}
 
-<body>
+#hand,
+#opponentHand{
+gap:6px;
+}
 
-<div id="status"></div>
+.effectText{
+font-size:32px;
+}
 
-<div id="scores"></div>
-
-<button id="restartBtn">
-  Play Again
-</button>
-
-<!-- OPPONENT -->
-<div id="opponentHand"></div>
-
-<!-- CENTER -->
-<div class="row">
-
-  <!-- FIXED DECK GRAPHIC -->
-  <div id="deck">
-    <img
-      src="/cards/back.png"
-      alt="Deck"
-    >
-  </div>
-
-  <div id="discard"></div>
-
-</div>
-
-<!-- PLAYER -->
-<div id="hand"></div>
-
-<!-- PENDING -->
-<div id="pending"></div>
-
-<!-- ACTIONS -->
-<div class="row">
-  <button id="ghouliesBtn">
-    Call Ghoulies
-  </button>
-</div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script src="game.js"></script>
-
-</body>
-</html>
+.bigCard{
+width:75px;
+}
+}
