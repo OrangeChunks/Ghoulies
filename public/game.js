@@ -116,7 +116,7 @@ function animateCard(fromEl,toEl,image){
 
     img.remove();
 
-  },600);
+  },950);
 }
 
 function showText(text,color="#fff"){
@@ -178,7 +178,7 @@ function highlightCard(el, color="#00ff88"){
   el.style.boxShadow = `0 0 20px ${color}`;
   el.style.transform = "scale(1.2) translateY(-10px)";
   el.style.zIndex = "10";
-  el.style.transition = "0.15s";
+  el.style.transition = "0.4s ease";
 
   setTimeout(() => {
 
@@ -200,6 +200,35 @@ socket.on("state", g => {
       );
 
     switch(g.effect.type){
+      case "skip":
+
+  showText(
+    "SKIP TURN",
+    "#ff8800"
+  );
+
+  break;
+
+  case "ghoulies":
+
+  showText(
+    "☠ GHOULIES ☠",
+    "#ff00ff"
+  );
+
+  document.body.classList.add(
+    "snapFlash"
+  );
+
+  setTimeout(() => {
+
+    document.body.classList.remove(
+      "snapFlash"
+    );
+
+  },500);
+
+  break;
 
       case "drawDeck":
 
@@ -274,6 +303,24 @@ socket.on("state", g => {
           },400);
 
           highlightCard(handEl,"#ffd000");
+          const marker =
+  document.createElement("div");
+
+marker.className =
+  "swapMarker";
+
+marker.innerText =
+  "⇄";
+
+handEl.parentElement?.appendChild(
+  marker
+);
+
+setTimeout(() => {
+
+  marker.remove();
+
+},2000);
 
           setTimeout(() => {
 
@@ -299,26 +346,46 @@ socket.on("state", g => {
         break;
       }
 
-      case "snapSuccess":
+      case "snapSuccess": {
 
-        showText(
-          "SNAP!",
-          "#00ff88"
-        );
+  const cardEl =
+    g.effect.player === myId
+      ? document.querySelector("#hand img")
+      : document.querySelector("#opponentHand img");
 
-        document.body.classList.add(
-          "snapFlash"
-        );
+  if (cardEl){
 
-        setTimeout(() => {
+    highlightCard(
+      cardEl,
+      "#00ff88"
+    );
 
-          document.body.classList.remove(
-            "snapFlash"
-          );
+    animateCard(
+      cardEl,
+      document.getElementById("discard"),
+      "/cards/back.png"
+    );
+  }
 
-        },200);
+  showText(
+    "SNAP!",
+    "#00ff88"
+  );
 
-        break;
+  document.body.classList.add(
+    "snapFlash"
+  );
+
+  setTimeout(() => {
+
+    document.body.classList.remove(
+      "snapFlash"
+    );
+
+  },300);
+
+  break;
+}
 
       case "snapFail":
 
@@ -369,6 +436,27 @@ socket.on("state", g => {
 
           highlightCard(ownEl,"#00ffcc");
           highlightCard(oppEl,"#ff00ff");
+          for (const el of [ownEl, oppEl]){
+
+  const marker =
+    document.createElement("div");
+
+  marker.className =
+    "swapMarker";
+
+  marker.innerText =
+    "⇄";
+
+  el.parentElement?.appendChild(
+    marker
+  );
+
+  setTimeout(() => {
+
+    marker.remove();
+
+  },2000);
+}
 
           setTimeout(() => {
 

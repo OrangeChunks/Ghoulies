@@ -186,9 +186,10 @@ io.on("connection", socket => {
         delete g.skipTurn[id];
 
         g.effect = {
-          type:"skip",
-          player:id
-        };
+  type:"skip",
+  player:id,
+  markerId:Date.now()
+};
 
       } else {
 
@@ -448,14 +449,16 @@ io.on("connection", socket => {
 
     g.discard.push(discarded);
 
-    g.effect = {
+   g.effect = {
 
-      type:"swap",
+  type:"swap",
 
-      player:socket.id,
+  player:socket.id,
 
-      handIndex:i
-    };
+  handIndex:i,
+
+  markerId:Date.now()
+};
 
     if (discarded.startsWith("10")){
 
@@ -562,14 +565,16 @@ io.on("connection", socket => {
 
     g.effect = {
 
-      type:"tenSwap",
+  type:"tenSwap",
 
-      player:playerId,
+  player:playerId,
 
-      ownIndex:i1,
+  ownIndex:i1,
 
-      oppIndex:oppIndex
-    };
+  oppIndex:oppIndex,
+
+  markerId:Date.now()
+};
 
     g.tenSwap = null;
 
@@ -610,10 +615,12 @@ io.on("connection", socket => {
 
       g.effect = {
 
-        type:"snapSuccess",
+  type:"snapSuccess",
 
-        player:socket.id
-      };
+  player:socket.id,
+
+  markerId:Date.now()
+};
 
     } else {
 
@@ -657,10 +664,12 @@ io.on("connection", socket => {
 
     g.effect = {
 
-      type:"ghoulies",
+  type:"ghoulies",
 
-      player:caller
-    };
+  player:caller,
+
+  markerId:Date.now()
+};
 
     g.ghouliesCaller =
       caller;
