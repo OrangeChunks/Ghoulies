@@ -531,6 +531,9 @@ io.on("connection", socket => {
         player:socket.id
       };
 
+      // FIX 4: Clear the "opponent used a SPECIAL 10" message
+      g.message = {};
+
       g.tenSwap = null;
 
       endTurn(g,socket.id);
@@ -594,6 +597,9 @@ io.on("connection", socket => {
 
       oppIndex:oppIndex
     };
+
+    // FIX 4: Clear the "opponent used a SPECIAL 10" message now that the swap is done
+    g.message = {};
 
     g.tenSwap = null;
 

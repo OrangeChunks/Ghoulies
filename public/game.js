@@ -14,9 +14,6 @@ let memoryDone = false;
 
 let shownRoundPopup = false;
 
-// FIX #8: Removed the top-level connectToRoom() call.
-// The "connect" event fires reliably on every (re)connect,
-// so calling it here as well caused a duplicate "join" emit on first load.
 function connectToRoom(){
 
   socket.emit("join", "room1");
@@ -62,153 +59,113 @@ function areaForPlayer(playerId){
 
 function centerOf(el){
 
-  const r =
-    el.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
 
   return {
-
-    x:r.left + r.width/2,
-
-    y:r.top + r.height/2
+    x: r.left + r.width / 2,
+    y: r.top  + r.height / 2
   };
 }
 
-function animateCard(fromEl,toEl,image){
+function animateCard(fromEl, toEl, image){
 
-  if (!fromEl || !toEl || !image){
-    return;
-  }
+  if (!fromEl || !toEl || !image) return;
 
-  const fx =
-    document.getElementById("fxLayer");
+  const fx = document.getElementById("fxLayer");
 
-  const start =
-    centerOf(fromEl);
+  const start = centerOf(fromEl);
+  const end   = centerOf(toEl);
 
-  const end =
-    centerOf(toEl);
+  const img = document.createElement("img");
 
-  const img =
-    document.createElement("img");
-
-  img.src = image;
-
+  img.src       = image;
   img.className = "flyingCard";
-
-  img.style.left =
-    start.x + "px";
-
-  img.style.top =
-    start.y + "px";
+  img.style.left = start.x + "px";
+  img.style.top  = start.y + "px";
 
   fx.appendChild(img);
 
   requestAnimationFrame(() => {
-
-    img.style.left =
-      end.x + "px";
-
-    img.style.top =
-      end.y + "px";
-
-    img.style.transform =
-      "rotate(12deg)";
+    img.style.left      = end.x + "px";
+    img.style.top       = end.y + "px";
+    img.style.transform = "rotate(12deg)";
   });
 
-  setTimeout(() => {
-
-    img.remove();
-
-  },600);
+  setTimeout(() => img.remove(), 600);
 }
 
-function showText(text,color="#fff"){
+function showText(text, color="#fff"){
 
-  const fx =
-    document.getElementById("fxLayer");
+  const fx  = document.getElementById("fxLayer");
+  const div = document.createElement("div");
 
-  const div =
-    document.createElement("div");
-
-  div.className =
-    "effectText";
-
-  div.style.color =
-    color;
-
-  div.innerText =
-    text;
+  div.className  = "effectText";
+  div.style.color = color;
+  div.innerText  = text;
 
   fx.appendChild(div);
 
-  setTimeout(() => {
-
-    div.remove();
-
-  },1000);
+  setTimeout(() => div.remove(), 1000);
 }
 
 function pulseCard(selector){
 
-  const el =
-    document.querySelector(selector);
+  const el = document.querySelector(selector);
 
   if (!el) return;
 
-  el.style.transition =
-    "0.2s";
-
-  el.style.boxShadow =
-    "0 0 30px #00ff88";
-
-  el.style.transform =
-    "scale(1.15)";
+  el.style.transition = "0.2s";
+  el.style.boxShadow  = "0 0 30px #00ff88";
+  el.style.transform  = "scale(1.15)";
 
   setTimeout(() => {
-
     el.style.boxShadow = "";
-
     el.style.transform = "";
-
-  },700);
+  }, 700);
 }
 
 function highlightCard(el, color="#00ff88"){
 
   if (!el) return;
 
-  el.style.outline = `5px solid ${color}`;
-  el.style.boxShadow = `0 0 20px ${color}`;
-  el.style.transform = "scale(1.2) translateY(-10px)";
-  el.style.zIndex = "10";
+  el.style.outline    = `5px solid ${color}`;
+  el.style.boxShadow  = `0 0 20px ${color}`;
+  el.style.transform  = "scale(1.2) translateY(-10px)";
+  el.style.zIndex     = "10";
   el.style.transition = "0.15s";
 
   setTimeout(() => {
-    el.style.outline = "";
+    el.style.outline   = "";
     el.style.boxShadow = "";
     el.style.transform = "";
-    el.style.zIndex = "";
+    el.style.zIndex    = "";
   }, 900);
 }
 
+// ---------------------------------------------------------------------------
+// FIX 1 + 2 + 3: render() is now called BEFORE effects are processed.
+// This means all animations and highlights query the LIVE, up-to-date DOM
+// that render() just built — not stale/detached nodes from the previous frame.
+// FIX 1 (duplicate cards): opponentPendingCard visibility is managed entirely
+// inside render() based on state, so it can never get out of sync with the
+// hand cards drawn by render().
+// ---------------------------------------------------------------------------
 socket.on("state", g => {
 
+  // Commit the new state and rebuild the DOM first.
+  state = g;
+  render();
+
+  // Now run visual effects against the freshly-rendered DOM.
   if (g.effect){
 
-    const actor =
-      areaForPlayer(
-        g.effect.player
-      );
+    const actor = areaForPlayer(g.effect.player);
 
     switch(g.effect.type){
 
-      // FIX #16: Each case wrapped in {} to safely scope const/let declarations
       case "drawDeck": {
 
-        showText(
-          "DRAW",
-          "#00d0ff"
-        );
+        showText("DRAW", "#00d0ff");
 
         animateCard(
           document.getElementById("deck"),
@@ -216,31 +173,12 @@ socket.on("state", g => {
           "/cards/back.png"
         );
 
-        setTimeout(() => {
-
-          if (g.effect.player !== myId){
-
-            const pendingCard =
-              document.getElementById(
-                "opponentPendingCard"
-              );
-
-            if (pendingCard){
-              pendingCard.style.display = "block";
-            }
-          }
-
-        }, 500);
-
         break;
       }
 
       case "takeDiscard": {
 
-        showText(
-          "TAKE",
-          "#00ff88"
-        );
+        showText("TAKE", "#00ff88");
 
         animateCard(
           document.getElementById("discard"),
@@ -248,40 +186,12 @@ socket.on("state", g => {
           document.querySelector("#discard img")?.src
         );
 
-        setTimeout(() => {
-
-          if (g.effect.player !== myId){
-
-            const pendingCard =
-              document.getElementById(
-                "opponentPendingCard"
-              );
-
-            if (pendingCard){
-              pendingCard.style.display = "block";
-            }
-          }
-
-        }, 500);
-
         break;
       }
 
       case "discard": {
 
-        const pendingCard =
-          document.getElementById(
-            "opponentPendingCard"
-          );
-
-        if (pendingCard){
-          pendingCard.style.display = "none";
-        }
-
-        showText(
-          "DISCARD",
-          "#ff4444"
-        );
+        showText("DISCARD", "#ff4444");
 
         animateCard(
           actor.pending,
@@ -292,91 +202,77 @@ socket.on("state", g => {
         break;
       }
 
+      // FIX 2: opponent swap now queries the correct live DOM nodes because
+      // render() has already run. The card image that was swapped in is shown
+      // briefly via a temporary overlay so the opponent's card face is visible
+      // to the local player during the animation before it flips back to hidden.
       case "swap": {
 
         showText("SWAP", "#ffd000");
 
-        const handSelector =
-          g.effect.player === myId
-            ? `#hand img[data-index="${g.effect.handIndex}"]`
-            : `#opponentHand img[data-oppindex="${g.effect.handIndex}"]`;
+        const isMe = g.effect.player === myId;
 
-        const handEl =
-          document.querySelector(handSelector);
+        const handSelector = isMe
+          ? `#hand img[data-index="${g.effect.handIndex}"]`
+          : `#opponentHand img[data-oppindex="${g.effect.handIndex}"]`;
 
-        if (handEl){
+        const handEl = document.querySelector(handSelector);
 
-          handEl.classList.add("swapping");
+        // Show the card value that was just swapped INTO this slot
+        // (the server has already updated the hand, so g.players gives us
+        // the new card sitting at handIndex right now)
+        const swappedInCard =
+          g.players[g.effect.player]?.hand?.[g.effect.handIndex];
+
+        if (!isMe && handEl && swappedInCard){
+
+          // Briefly reveal the face of the card the opponent swapped in
+          // so the watching player can see what they received.
+          handEl.src = file(swappedInCard);
 
           setTimeout(() => {
-            handEl.classList.remove("swapping");
-          }, 400);
+            // Flip back to hidden after the reveal window
+            if (handEl) handEl.src = back();
+          }, 1800);
         }
 
-        highlightCard(handEl,"#ffd000");
+        if (handEl){
+          handEl.classList.add("swapping");
+          setTimeout(() => handEl.classList.remove("swapping"), 400);
+        }
+
+        highlightCard(handEl, "#ffd000");
+
+        const source = isMe
+          ? actor.pending
+          : document.getElementById("opponentPendingCard");
 
         setTimeout(() => {
-
-          const source =
-            g.effect.player === myId
-              ? actor.pending
-              : document.getElementById(
-                  "opponentPendingCard"
-                );
-
-          animateCard(
-            source,
-            handEl,
-            "/cards/back.png"
-          );
-
+          animateCard(source, handEl, "/cards/back.png");
           setTimeout(() => {
             animateCard(
               handEl,
               document.getElementById("discard"),
               "/cards/back.png"
             );
-          },150);
-
-        },200);
+          }, 150);
+        }, 200);
 
         setTimeout(() => {
-
-          if (g.effect.player === myId){
-
-            pulseCard(
-              `#hand img[data-index="${g.effect.handIndex}"]`
-            );
-
-          } else {
-
-            pulseCard(
-              `#opponentHand img[data-oppindex="${g.effect.handIndex}"]`
-            );
-          }
-
-        },300);
+          pulseCard(handSelector);
+        }, 300);
 
         break;
       }
 
       case "ghoulies": {
 
-        showText(
-          "GHOULIES!",
-          "#ff4444"
-        );
+        showText("GHOULIES!", "#ff4444");
 
-        document.body.classList.add(
-          "ghouliesFlash"
-        );
+        document.body.classList.add("ghouliesFlash");
 
         setTimeout(() => {
-
-          document.body.classList.remove(
-            "ghouliesFlash"
-          );
-
+          document.body.classList.remove("ghouliesFlash");
         }, 500);
 
         break;
@@ -384,104 +280,94 @@ socket.on("state", g => {
 
       case "skip": {
 
-        showText(
-          "TURN SKIPPED",
-          "#ff8800"
-        );
-
+        showText("TURN SKIPPED", "#ff8800");
         break;
       }
 
       case "snapSuccess": {
 
-        showText(
-          "SNAP!",
-          "#00ff88"
-        );
+        showText("SNAP!", "#00ff88");
 
-        document.body.classList.add(
-          "snapFlash"
-        );
+        document.body.classList.add("snapFlash");
 
         setTimeout(() => {
-
-          document.body.classList.remove(
-            "snapFlash"
-          );
-
-        },200);
+          document.body.classList.remove("snapFlash");
+        }, 200);
 
         break;
       }
 
       case "snapFail": {
 
-        showText(
-          "MISS!",
-          "#ff0000"
-        );
-
+        showText("MISS!", "#ff0000");
         break;
       }
 
+      // FIX 3: tenSwap now queries live DOM nodes (render already ran).
+      // Additionally we briefly reveal the actual card faces to BOTH players
+      // so everyone can see exactly which card moved where.
       case "tenSwap": {
 
         showText("SPECIAL 10", "gold");
 
-        const mine =
-          g.effect.player === myId;
+        const mine = g.effect.player === myId;
 
-        const ownSelector =
-          mine
-            ? `#hand img[data-index="${g.effect.ownIndex}"]`
-            : `#opponentHand img[data-oppindex="${g.effect.ownIndex}"]`;
+        // From each player's perspective:
+        //   ownEl  = the slot belonging to whoever played the 10
+        //   oppEl  = the slot belonging to the other player
+        const ownSelector = mine
+          ? `#hand img[data-index="${g.effect.ownIndex}"]`
+          : `#opponentHand img[data-oppindex="${g.effect.ownIndex}"]`;
 
-        const oppSelector =
-          mine
-            ? `#opponentHand img[data-oppindex="${g.effect.oppIndex}"]`
-            : `#hand img[data-index="${g.effect.oppIndex}"]`;
+        const oppSelector = mine
+          ? `#opponentHand img[data-oppindex="${g.effect.oppIndex}"]`
+          : `#hand img[data-index="${g.effect.oppIndex}"]`;
 
-        const ownEl =
-          document.querySelector(ownSelector);
+        const ownEl = document.querySelector(ownSelector);
+        const oppEl = document.querySelector(oppSelector);
 
-        const oppEl =
-          document.querySelector(oppSelector);
+        // The server has already swapped the cards in state, so:
+        //   ownEl now holds what the 10-player RECEIVED (oppCard)
+        //   oppEl now holds what the other player RECEIVED (ownCard)
+        const tenPlayerId = g.effect.player;
+        const otherPlayerId = g.order.find(id => id !== tenPlayerId);
+
+        const cardNowAtOwn =
+          g.players[tenPlayerId]?.hand?.[g.effect.ownIndex];
+
+        const cardNowAtOpp =
+          g.players[otherPlayerId]?.hand?.[g.effect.oppIndex];
+
+        // Briefly show actual card faces so both players see what moved
+        if (ownEl && cardNowAtOwn){
+          ownEl.src = file(cardNowAtOwn);
+          setTimeout(() => { if (ownEl) ownEl.src = back(); }, 1800);
+        }
+
+        if (oppEl && cardNowAtOpp && !mine){
+          // The opponent's slot is one of MY cards — keep it face-up
+          // (render() already shows my cards face-down; just let the
+          // timed flip handle it)
+          oppEl.src = file(cardNowAtOpp);
+          setTimeout(() => { if (oppEl) oppEl.src = back(); }, 1800);
+        }
 
         if (ownEl){
-
           ownEl.classList.add("swapping");
-
-          setTimeout(() => {
-            ownEl.classList.remove("swapping");
-          }, 400);
+          setTimeout(() => ownEl.classList.remove("swapping"), 400);
         }
 
         if (oppEl){
-
           oppEl.classList.add("swapping");
-
-          setTimeout(() => {
-            oppEl.classList.remove("swapping");
-          }, 400);
+          setTimeout(() => oppEl.classList.remove("swapping"), 400);
         }
 
-        highlightCard(ownEl,"#00ffcc");
-        highlightCard(oppEl,"#ff00ff");
+        highlightCard(ownEl, "#00ffcc");
+        highlightCard(oppEl, "#ff00ff");
 
         setTimeout(() => {
-
-          animateCard(
-            ownEl,
-            oppEl,
-            "/cards/back.png"
-          );
-
-          animateCard(
-            oppEl,
-            ownEl,
-            "/cards/back.png"
-          );
-
+          animateCard(ownEl, oppEl, "/cards/back.png");
+          animateCard(oppEl, ownEl, "/cards/back.png");
         }, 200);
 
         break;
@@ -489,28 +375,18 @@ socket.on("state", g => {
     }
   }
 
-  state = g;
-
-  if (
-    state.roundResult &&
-    !shownRoundPopup
-  ){
+  // Round result popup
+  if (state.roundResult && !shownRoundPopup){
 
     shownRoundPopup = true;
 
-    // FIX #3: roundResult entries are now objects { score, label }
-    // so we display them correctly without risking NaN in arithmetic
-    const result =
-      state.roundResult[myId];
+    const result = state.roundResult[myId];
 
-    const scoreDisplay =
-      result.label
-        ? `${result.score} (${result.label})`
-        : `${result.score}`;
+    const scoreDisplay = result.label
+      ? `${result.score} (${result.label})`
+      : `${result.score}`;
 
-    // FIX #13: Use ?? 0 instead of || 0 so a genuine score of 0 is shown correctly
-    const totalScore =
-      state.scores[myId] ?? 0;
+    const totalScore = state.scores[myId] ?? 0;
 
     alert(
 `ROUND OVER
@@ -523,194 +399,108 @@ ${totalScore}`
     );
 
     memoryDone = false;
-
-    revealed = [];
+    revealed   = [];
   }
 
   if (!state.roundResult){
-
     shownRoundPopup = false;
   }
-
-  render();
 });
 
 socket.on("forceReload", () => {
-
   location.reload();
 });
 
 function file(card){
 
-  const v =
-    card.slice(0,-1);
-
-  const s =
-    card.slice(-1);
+  const v = card.slice(0,-1);
+  const s = card.slice(-1);
 
   const suitMap = {
-
     "♠":"s",
-
     "♥":"h",
-
     "♦":"d",
-
     "♣":"c"
   };
 
   const valueMap = {
-
-    "A":"01",
-
-    "2":"02",
-
-    "3":"03",
-
-    "4":"04",
-
-    "5":"05",
-
-    "6":"06",
-
-    "7":"07",
-
-    "8":"08",
-
-    "9":"09",
-
-    "10":"10",
-
-    "J":"11",
-
-    "Q":"12",
-
-    "K":"13"
+    "A":"01","2":"02","3":"03","4":"04",
+    "5":"05","6":"06","7":"07","8":"08",
+    "9":"09","10":"10","J":"11","Q":"12","K":"13"
   };
 
   return `/cards/${suitMap[s]}${valueMap[v]}.png`;
 }
 
 function back(){
-
   return "/cards/back.png";
 }
 
 function clickedDeck(el){
-
-  return (
-    el.id === "deck" ||
-    el.closest("#deck")
-  );
+  return el.id === "deck" || el.closest("#deck");
 }
 
 function render(){
 
-  if (!state || !myId){
-    return;
-  }
+  if (!state || !myId) return;
 
-  const p = me();
-
-  const o =
-    state.players?.[oppId()];
-
-  const turn =
-    state.order[state.turn]
-    === myId;
+  const p    = me();
+  const o    = state.players?.[oppId()];
+  const turn = state.order[state.turn] === myId;
 
   document
     .getElementById("hand")
-    .classList.toggle(
-      "activeTurn",
-      turn
-    );
+    .classList.toggle("activeTurn", turn);
 
+  // --- Status text ---
   let statusText = "";
 
   if (!memoryDone){
 
-    statusText =
-      `Memorise 2 cards (${revealed.length}/2)`;
+    statusText = `Memorise 2 cards (${revealed.length}/2)`;
 
-  } else if (
-    state.tenSwap &&
-    state.tenSwap.player === myId
-  ){
+  } else if (state.tenSwap && state.tenSwap.player === myId){
 
-    if (
-      state.tenSwap.selectingOwn
-    ){
-
-      statusText =
-        "Choose YOUR card";
-
-    } else {
-
-      statusText =
-        "Choose OPPONENT card";
-    }
+    statusText = state.tenSwap.selectingOwn
+      ? "Choose YOUR card"
+      : "Choose OPPONENT card";
 
   } else {
 
-    statusText =
-      turn
-      ? "YOUR TURN"
-      : "OPPONENT TURN";
+    statusText = turn ? "YOUR TURN" : "OPPONENT TURN";
   }
 
-  if (
-    state.message &&
-    state.message[myId]
-  ){
-
-    statusText =
-      state.message[myId];
+  if (state.message && state.message[myId]){
+    statusText = state.message[myId];
   }
 
-  document.getElementById(
-    "status"
-  ).innerText =
-    statusText;
+  document.getElementById("status").innerText = statusText;
 
-  // FIX #13: Use ?? 0 instead of || 0 so a score of 0 renders as "0" not hidden
-  document.getElementById(
-    "scores"
-  ).innerHTML =
-`
-You: ${state.scores?.[myId] ?? 0}
-|
-Opponent: ${state.scores?.[oppId()] ?? 0}
-`;
+  // --- Scores ---
+  document.getElementById("scores").innerHTML =
+    `You: ${state.scores?.[myId] ?? 0} | Opponent: ${state.scores?.[oppId()] ?? 0}`;
 
-  document.getElementById(
-    "hand"
-  ).innerHTML =
-
+  // --- My hand ---
+  document.getElementById("hand").innerHTML =
     p?.hand?.map((c,i) => {
 
-      const visible =
-        revealed.includes(i);
+      const visible = revealed.includes(i);
 
       const tenGlow =
         state.tenSwap &&
         state.tenSwap.player === myId &&
         state.tenSwap.selectingOwn;
 
-      return `
-        <img
-          class="card ${tenGlow ? "tenGlow" : ""}"
-          data-card="${c}"
-          data-index="${i}"
-          src="${visible ? file(c) : back()}"
-        >
-      `;
+      return `<img
+        class="card ${tenGlow ? "tenGlow" : ""}"
+        data-card="${c}"
+        data-index="${i}"
+        src="${visible ? file(c) : back()}"
+      >`;
     }).join("") || "";
 
-  document.getElementById(
-    "opponentHand"
-  ).innerHTML =
-
+  // --- Opponent hand ---
+  document.getElementById("opponentHand").innerHTML =
     o?.hand?.map((c,i) => {
 
       const tenGlow =
@@ -718,277 +508,179 @@ Opponent: ${state.scores?.[oppId()] ?? 0}
         state.tenSwap.player === myId &&
         !state.tenSwap.selectingOwn;
 
-      return `
-        <img
-          class="card ${tenGlow ? "tenGlow" : ""}"
-          data-oppindex="${i}"
-          src="${back()}"
-        >
-      `;
+      return `<img
+        class="card ${tenGlow ? "tenGlow" : ""}"
+        data-oppindex="${i}"
+        src="${back()}"
+      >`;
     }).join("") || "";
 
-  const top =
-    state.discard?.at(-1);
+  // --- Discard ---
+  const top = state.discard?.at(-1);
 
-  document.getElementById(
-    "discard"
-  ).innerHTML =
+  document.getElementById("discard").innerHTML =
+    top ? `<img class="card pop" src="${file(top)}">` : "";
 
-    top
-      ? `<img class="card pop" src="${file(top)}">`
-      : "";
+  // --- My pending card ---
+  const pending = p?.pending;
 
-  const pending =
-    p?.pending;
-
-  document.getElementById(
-    "pending"
-  ).innerHTML =
-
+  document.getElementById("pending").innerHTML =
     pending && turn
-      ? `
-        <div>
-
-          <div style="margin-bottom:8px">
-            Picked Up
-          </div>
-
-          <img
-            class="card flip bigCard"
-            src="${file(pending)}"
-          >
-
-        </div>
-      `
+      ? `<div>
+           <div style="margin-bottom:8px">Picked Up</div>
+           <img class="card flip bigCard" src="${file(pending)}">
+         </div>`
       : "";
 
-  document.getElementById(
-    "noSwapBtn"
-  ).style.display =
+  // FIX 1: opponentPendingCard visibility is driven entirely by state here,
+  // so it never gets out of sync with the hand cards render() just stamped.
+  const opponentPendingCard =
+    document.getElementById("opponentPendingCard");
 
-    (
-      state.tenSwap &&
-      state.tenSwap.player === myId &&
-      state.tenSwap.selectingOwn
-    )
+  if (opponentPendingCard){
+
+    const oppPlayer    = state.players?.[oppId()];
+    const oppHasPending = !!(oppPlayer?.pending);
+
+    opponentPendingCard.style.display =
+      oppHasPending ? "block" : "none";
+  }
+
+  // --- No-swap button ---
+  document.getElementById("noSwapBtn").style.display =
+    (state.tenSwap &&
+     state.tenSwap.player === myId &&
+     state.tenSwap.selectingOwn)
       ? "inline-block"
       : "none";
 
-  document.getElementById(
-    "restartBtn"
-  ).style.display =
-
-    state.gameOver
-      ? "block"
-      : "none";
+  // --- Restart button ---
+  document.getElementById("restartBtn").style.display =
+    state.gameOver ? "block" : "none";
 }
 
-document.addEventListener(
-  "click",
-  e => {
+// ---------------------------------------------------------------------------
+// Click handler
+// ---------------------------------------------------------------------------
+document.addEventListener("click", e => {
 
-    if (!state) return;
+  if (!state) return;
 
-    if (!memoryDone){
+  // Memory phase
+  if (!memoryDone){
 
-      if (
-        e.target.dataset.index
-        !== undefined
-      ){
+    if (e.target.dataset.index !== undefined){
 
-        if (
-          revealed.length >= 2
-        ){
-          return;
-        }
+      if (revealed.length >= 2) return;
 
-        const i =
-          Number(
-            e.target.dataset.index
-          );
+      const i = Number(e.target.dataset.index);
 
-        if (
-          !revealed.includes(i)
-        ){
+      if (!revealed.includes(i)){
 
-          revealed.push(i);
+        revealed.push(i);
+        render();
 
-          render();
-
-          if (
-            revealed.length === 2
-          ){
-
-            setTimeout(() => {
-
-              revealed = [];
-
-              memoryDone = true;
-
-              render();
-
-            },5000);
-          }
+        if (revealed.length === 2){
+          setTimeout(() => {
+            revealed   = [];
+            memoryDone = true;
+            render();
+          }, 5000);
         }
       }
-
-      return;
     }
 
-    if (
-      e.target.id === "noSwapBtn"
-    ){
+    return;
+  }
 
-      socket.emit(
-        "tenOwn",
-        null
-      );
+  // No-swap button
+  if (e.target.id === "noSwapBtn"){
+    socket.emit("tenOwn", null);
+    return;
+  }
 
-      return;
+  // Ten-swap: select own card
+  if (
+    state.tenSwap &&
+    state.tenSwap.player === myId &&
+    state.tenSwap.selectingOwn &&
+    e.target.dataset.index !== undefined
+  ){
+    socket.emit("tenOwn", Number(e.target.dataset.index));
+    return;
+  }
+
+  // Ten-swap: select opponent card
+  if (
+    state.tenSwap &&
+    state.tenSwap.player === myId &&
+    !state.tenSwap.selectingOwn &&
+    e.target.dataset.oppindex !== undefined
+  ){
+    socket.emit("tenOpp", Number(e.target.dataset.oppindex));
+    return;
+  }
+
+  // Draw from deck
+  if (clickedDeck(e.target)){
+
+    document.getElementById("deck").classList.add("deckShake");
+
+    setTimeout(() => {
+      document.getElementById("deck").classList.remove("deckShake");
+    }, 300);
+
+    socket.emit("draw");
+    return;
+  }
+
+  // Discard pile
+  if (e.target.closest("#discard")){
+
+    if (me()?.pending){
+      socket.emit("discardPending");
+    } else {
+      socket.emit("takeDiscard");
     }
 
-    if (
-      state.tenSwap &&
-      state.tenSwap.player === myId &&
-      state.tenSwap.selectingOwn &&
-      e.target.dataset.index !== undefined
-    ){
+    return;
+  }
 
-      socket.emit(
-        "tenOwn",
-        Number(
-          e.target.dataset.index
-        )
-      );
+  // Swap card from hand
+  if (e.target.dataset.card && me()?.pending){
+    socket.emit("swap", e.target.dataset.card);
+    return;
+  }
 
-      return;
-    }
+  // Ghoulies button
+  if (e.target.id === "ghouliesBtn"){
+    socket.emit("callGhoulies");
+    return;
+  }
 
-    if (
-      state.tenSwap &&
-      state.tenSwap.player === myId &&
-      !state.tenSwap.selectingOwn &&
-      e.target.dataset.oppindex !== undefined
-    ){
+  // Restart button
+  if (e.target.id === "restartBtn"){
+    socket.emit("restart", "room1");
+    return;
+  }
 
-      socket.emit(
-        "tenOpp",
-        Number(
-          e.target.dataset.oppindex
-        )
-      );
-
-      return;
-    }
-
-    if (
-      clickedDeck(e.target)
-    ){
-
-      document
-        .getElementById("deck")
-        .classList.add(
-          "deckShake"
-        );
-
-      setTimeout(() => {
-
-        document
-          .getElementById("deck")
-          .classList.remove(
-            "deckShake"
-          );
-
-      },300);
-
-      socket.emit("draw");
-
-      return;
-    }
-
-    if (
-      e.target.closest("#discard")
-    ){
-
-      if (me()?.pending){
-
-        socket.emit(
-          "discardPending"
-        );
-
-      } else {
-
-        socket.emit(
-          "takeDiscard"
-        );
-      }
-
-      return;
-    }
-
-    if (
-      e.target.dataset.card &&
-      me()?.pending
-    ){
-
-      socket.emit(
-        "swap",
-        e.target.dataset.card
-      );
-
-      return;
-    }
-
-    if (
-      e.target.id === "ghouliesBtn"
-    ){
-
-      socket.emit(
-        "callGhoulies"
-      );
-
-      return;
-    }
-
-    if (
-      e.target.id === "restartBtn"
-    ){
-
-      socket.emit(
-        "restart",
-        "room1"
-      );
-
-      return;
-    }
-
-    if (
-      e.target.id === "resetBtn"
-    ){
-
-      socket.emit(
-        "fullReset",
-        "room1"
-      );
-
-      return;
-    }
+  // Reset button
+  if (e.target.id === "resetBtn"){
+    socket.emit("fullReset", "room1");
+    return;
+  }
 });
 
-document.addEventListener(
-  "dblclick",
-  e => {
+// ---------------------------------------------------------------------------
+// Double-click → snap
+// ---------------------------------------------------------------------------
+document.addEventListener("dblclick", e => {
 
-    if (!memoryDone) return;
+  if (!memoryDone) return;
 
-    const c =
-      e.target.dataset.card;
+  const c = e.target.dataset.card;
 
-    if (c){
-
-      socket.emit(
-        "snap",
-        c
-      );
-    }
+  if (c){
+    socket.emit("snap", c);
+  }
 });
