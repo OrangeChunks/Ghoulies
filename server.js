@@ -19,11 +19,18 @@ const VALUES = [
   "J","Q","K"
 ];
 
+// FIX #1: Replace biased sort-based shuffle with Fisher-Yates
 function shuffle(a){
 
-  return a.sort(
-    () => Math.random() - 0.5
-  );
+  for (let i = a.length - 1; i > 0; i--){
+
+    const j =
+      Math.floor(Math.random() * (i + 1));
+
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+
+  return a;
 }
 
 function createDeck(){
@@ -47,6 +54,8 @@ function calculate(hand){
 
     const v = c.slice(0,-1);
 
+    // NOTE: suits are stored as unicode symbols ♥ ♦ ♠ ♣
+    // Red suits are ♥ (hearts) and ♦ (diamonds) — Red King = 0 pts
     const s = c.slice(-1);
 
     if (
@@ -160,7 +169,7 @@ io.on("connection", socket => {
       g.order.push(socket.id);
 
       g.scores[socket.id] =
-        g.scores[socket.id] || 0;
+        g.scores[socket.id] ?? 0;
     }
 
     socket.emit("you", socket.id);
@@ -208,8 +217,7 @@ io.on("connection", socket => {
 
       const p = g.players[id];
 
-      let score =
-        calculate(p.hand);
+      let score = calculate(p.hand);
 
       if (g.ghouliesCaller === id){
 
@@ -222,24 +230,33 @@ io.on("connection", socket => {
         const otherScore =
           calculate(g.players[other].hand);
 
+        // FIX #3: Store score (number) and label separately so
+        // roundResult values stay numeric and never get parsed as NaN
         if (myScore < otherScore){
 
           score -= 5;
 
-          roundScores[id] =
-            `${score} (-5 Ghoulies Bonus)`;
+          roundScores[id] = {
+            score,
+            label: "-5 Ghoulies Bonus"
+          };
 
         } else {
 
           score += 5;
 
-          roundScores[id] =
-            `${score} (+5 Ghoulies Penalty)`;
+          roundScores[id] = {
+            score,
+            label: "+5 Ghoulies Penalty"
+          };
         }
 
       } else {
 
-        roundScores[id] = score;
+        roundScores[id] = {
+          score,
+          label: null
+        };
       }
 
       g.scores[id] += score;
@@ -247,14 +264,14 @@ io.on("connection", socket => {
 
     g.roundResult = roundScores;
 
+    // FIX #10: Only emit once here — removed the duplicate emit
+    // that previously existed in the "draw" handler after calling finishRound
     io.to(roomIdFromGame(g))
       .emit("state", g);
 
     const overPlayers =
       Object.entries(g.scores)
-        .filter(([id,score]) =>
-          score >= 51
-        );
+        .filter(([,score]) => score >= 51);
 
     if (overPlayers.length){
 
@@ -344,12 +361,11 @@ io.on("connection", socket => {
 
     if (p.pending) return;
 
+    // FIX #10: When deck runs out, call finishRound (which emits internally)
+    // and return — do NOT emit again after finishRound
     if (g.deck.length <= 0){
 
       finishRound(g);
-
-      io.to(roomId(socket))
-        .emit("state", g);
 
       return;
     }
@@ -396,11 +412,14 @@ io.on("connection", socket => {
       .emit("state", g);
   });
 
+  // FIX #7: Added isTurn() check so a player cannot discard out of turn
   socket.on("discardPending", () => {
 
     const g = getRoom(socket);
 
     if (!g) return;
+
+    if (!isTurn(g,socket.id)) return;
 
     const p =
       g.players[socket.id];
@@ -530,11 +549,14 @@ io.on("connection", socket => {
       .emit("state", g);
   });
 
+  // FIX #6: Added null guard for g.tenSwap before accessing .player
   socket.on("tenOpp", oppIndex => {
 
     const g = getRoom(socket);
 
     if (!g) return;
+
+    if (!g.tenSwap) return;
 
     const playerId =
       g.tenSwap.player;
@@ -581,64 +603,64 @@ io.on("connection", socket => {
       .emit("state", g);
   });
 
- socket.on("snap", card => {
+  socket.on("snap", card => {
 
-  const g = getRoom(socket);
+    const g = getRoom(socket);
 
-  if (!g) return;
+    if (!g) return;
 
-  const p =
-    g.players[socket.id];
+    const p =
+      g.players[socket.id];
 
-  const top =
-    g.discard.at(-1);
+    const top =
+      g.discard.at(-1);
 
-  if (!top) return;
+    if (!top) return;
 
-  if (
-    top.slice(0,-1) ===
-    card.slice(0,-1)
-  ){
+    if (
+      top.slice(0,-1) ===
+      card.slice(0,-1)
+    ){
 
-    const index =
-      p.hand.indexOf(card);
+      const index =
+        p.hand.indexOf(card);
 
-    if (index !== -1){
+      if (index !== -1){
 
-      p.hand.splice(index,1);
+        p.hand.splice(index,1);
 
-      if (p.hand.length === 0){
+        if (p.hand.length === 0){
 
-        finishRound(g);
+          finishRound(g);
 
-        return;
+          return;
+        }
       }
+
+      g.discard.push(card);
+
+      g.effect = {
+
+        type:"snapSuccess",
+
+        player:socket.id
+      };
+
+    } else {
+
+      g.skipTurn[socket.id] = true;
+
+      g.effect = {
+
+        type:"snapFail",
+
+        player:socket.id
+      };
     }
 
-    g.discard.push(card);
-
-    g.effect = {
-
-      type:"snapSuccess",
-
-      player:socket.id
-    };
-
-  } else {
-
-    g.skipTurn[socket.id] = true;
-
-    g.effect = {
-
-      type:"snapFail",
-
-      player:socket.id
-    };
-  }
-
-  io.to(roomId(socket))
-    .emit("state", g);
-});
+    io.to(roomId(socket))
+      .emit("state", g);
+  });
 
   socket.on("callGhoulies", () => {
 
@@ -684,14 +706,17 @@ io.on("connection", socket => {
       .emit("state", g);
   });
 
+  // FIX #15: Moved fullReset inside the connection block and fixed indentation
   socket.on("fullReset", room => {
 
-  delete rooms[room];
+    delete rooms[room];
 
-  io.to(room)
-    .emit("forceReload");
-});
+    io.to(room)
+      .emit("forceReload");
+  });
 
+  // FIX #12: On disconnect, notify remaining player and clean up the room
+  // so that if the disconnected player reconnects they get a fresh start
   socket.on("disconnect", () => {
 
     const room =
@@ -710,35 +735,63 @@ io.on("connection", socket => {
         id => id !== socket.id
       );
 
-    io.to(room)
-      .emit("state", g);
-  });
-  socket.on("restart", room => {
+    // If the room is now empty, delete it entirely
+    if (g.order.length === 0){
 
-  const oldGame = rooms[room];
+      delete rooms[room];
 
-  if (!oldGame) return;
+      return;
+    }
 
-  const newState = newGame();
+    // Room still has one player — reset game state so they aren't
+    // stuck in a broken mid-round state waiting for an opponent
+    const remainingId = g.order[0];
 
-  // preserve connected players
-  for (const id of oldGame.order) {
+    const freshGame = newGame();
 
-    newState.players[id] = {
-      hand: newState.deck.splice(0,4),
+    // Carry over the remaining player's accumulated scores
+    freshGame.players[remainingId] = {
+      hand: freshGame.deck.splice(0,4),
       pending: null
     };
 
-    newState.order.push(id);
+    freshGame.order = [remainingId];
 
-    // reset scores back to 0
-    newState.scores[id] = 0;
-  }
+    freshGame.scores[remainingId] =
+      g.scores[remainingId] ?? 0;
 
-  rooms[room] = newState;
+    rooms[room] = freshGame;
 
-  io.to(room).emit("state", newState);
-});
+    io.to(room).emit("state", freshGame);
+  });
+
+  // FIX #15: Moved restart inside the connection block and fixed indentation
+  socket.on("restart", room => {
+
+    const oldGame = rooms[room];
+
+    if (!oldGame) return;
+
+    const newState = newGame();
+
+    // Preserve connected players
+    for (const id of oldGame.order){
+
+      newState.players[id] = {
+        hand: newState.deck.splice(0,4),
+        pending: null
+      };
+
+      newState.order.push(id);
+
+      // Reset scores back to 0
+      newState.scores[id] = 0;
+    }
+
+    rooms[room] = newState;
+
+    io.to(room).emit("state", newState);
+  });
 
 });
 
