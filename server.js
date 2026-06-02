@@ -1,3 +1,5 @@
+// server.js
+
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -186,10 +188,9 @@ io.on("connection", socket => {
         delete g.skipTurn[id];
 
         g.effect = {
-  type:"skip",
-  player:id,
-  markerId:Date.now()
-};
+          type:"skip",
+          player:id
+        };
 
       } else {
 
@@ -449,16 +450,14 @@ io.on("connection", socket => {
 
     g.discard.push(discarded);
 
-   g.effect = {
+    g.effect = {
 
-  type:"swap",
+      type:"swap",
 
-  player:socket.id,
+      player:socket.id,
 
-  handIndex:i,
-
-  markerId:Date.now()
-};
+      handIndex:i
+    };
 
     if (discarded.startsWith("10")){
 
@@ -565,16 +564,14 @@ io.on("connection", socket => {
 
     g.effect = {
 
-  type:"tenSwap",
+      type:"tenSwap",
 
-  player:playerId,
+      player:playerId,
 
-  ownIndex:i1,
+      ownIndex:i1,
 
-  oppIndex:oppIndex,
-
-  markerId:Date.now()
-};
+      oppIndex:oppIndex
+    };
 
     g.tenSwap = null;
 
@@ -584,59 +581,64 @@ io.on("connection", socket => {
       .emit("state", g);
   });
 
-  socket.on("snap", card => {
+ socket.on("snap", card => {
 
-    const g = getRoom(socket);
+  const g = getRoom(socket);
 
-    if (!g) return;
+  if (!g) return;
 
-    const p =
-      g.players[socket.id];
+  const p =
+    g.players[socket.id];
 
-    const top =
-      g.discard.at(-1);
+  const top =
+    g.discard.at(-1);
 
-    if (!top) return;
+  if (!top) return;
 
-    if (
-      top.slice(0,-1) ===
-      card.slice(0,-1)
-    ){
+  if (
+    top.slice(0,-1) ===
+    card.slice(0,-1)
+  ){
 
-      const index =
-        p.hand.indexOf(card);
+    const index =
+      p.hand.indexOf(card);
 
-      if (index !== -1){
+    if (index !== -1){
 
-        p.hand.splice(index,1);
+      p.hand.splice(index,1);
+
+      if (p.hand.length === 0){
+
+        finishRound(g);
+
+        return;
       }
-
-      g.discard.push(card);
-
-      g.effect = {
-
-  type:"snapSuccess",
-
-  player:socket.id,
-
-  markerId:Date.now()
-};
-
-    } else {
-
-      g.skipTurn[socket.id] = true;
-
-      g.effect = {
-
-        type:"snapFail",
-
-        player:socket.id
-      };
     }
 
-    io.to(roomId(socket))
-      .emit("state", g);
-  });
+    g.discard.push(card);
+
+    g.effect = {
+
+      type:"snapSuccess",
+
+      player:socket.id
+    };
+
+  } else {
+
+    g.skipTurn[socket.id] = true;
+
+    g.effect = {
+
+      type:"snapFail",
+
+      player:socket.id
+    };
+  }
+
+  io.to(roomId(socket))
+    .emit("state", g);
+});
 
   socket.on("callGhoulies", () => {
 
@@ -664,12 +666,10 @@ io.on("connection", socket => {
 
     g.effect = {
 
-  type:"ghoulies",
+      type:"ghoulies",
 
-  player:caller,
-
-  markerId:Date.now()
-};
+      player:caller
+    };
 
     g.ghouliesCaller =
       caller;
@@ -686,21 +686,11 @@ io.on("connection", socket => {
 
   socket.on("fullReset", room => {
 
-    delete rooms[room];
+  delete rooms[room];
 
-    io.to(room)
-      .emit("forceReload");
-
-    setTimeout(() => {
-
-      io.sockets.sockets
-        .forEach(s => {
-
-          s.leave(room);
-        });
-
-    },200);
-  });
+  io.to(room)
+    .emit("forceReload");
+});
 
   socket.on("disconnect", () => {
 
@@ -723,6 +713,33 @@ io.on("connection", socket => {
     io.to(room)
       .emit("state", g);
   });
+  socket.on("restart", room => {
+
+  const oldGame = rooms[room];
+
+  if (!oldGame) return;
+
+  const newState = newGame();
+
+  // preserve connected players
+  for (const id of oldGame.order) {
+
+    newState.players[id] = {
+      hand: newState.deck.splice(0,4),
+      pending: null
+    };
+
+    newState.order.push(id);
+
+    // reset scores back to 0
+    newState.scores[id] = 0;
+  }
+
+  rooms[room] = newState;
+
+  io.to(room).emit("state", newState);
+});
+
 });
 
 server.listen(

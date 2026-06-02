@@ -220,9 +220,6 @@ button:hover{
 #restartBtn{
   display:none;
 }
-<div id="opponentPending"
-     style="position:absolute; top:20%; right:10%; width:80px; height:120px;">
-</div>
 
 #fxLayer{
   position:fixed;
@@ -252,6 +249,14 @@ button:hover{
   font-weight:bold;
   animation:effectPop 1s forwards;
   text-shadow:0 0 20px black;
+}
+
+#opponentPending{
+  position:absolute;
+  top:20%;
+  right:10%;
+  width:80px;
+  height:120px;
 }
 
 @keyframes effectPop{
@@ -318,6 +323,16 @@ button:hover{
 </button>
 
 <!-- OPPONENT -->
+
+<div id="opponentPending">
+  <img
+    id="opponentPendingCard"
+    class="card"
+    src="/cards/back.png"
+    style="display:none;"
+  >
+</div>
+
 <div id="opponentHand"></div>
 
 <!-- CENTER -->

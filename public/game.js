@@ -202,67 +202,112 @@ socket.on("state", g => {
 
       case "drawDeck":
 
-        showText(
-          "DRAW",
-          "#00d0ff"
+  showText(
+    "DRAW",
+    "#00d0ff"
+  );
+
+  animateCard(
+    document.getElementById("deck"),
+    actor.pending,
+    "/cards/back.png"
+  );
+
+  setTimeout(() => {
+
+    if (g.effect.player !== myId) {
+
+      const pendingCard =
+        document.getElementById(
+          "opponentPendingCard"
         );
 
-        animateCard(
-          document.getElementById("deck"),
-          actor.pending,
-          "/cards/back.png"
-        );
+      if (pendingCard) {
+        pendingCard.style.display = "block";
+      }
 
-        break;
+    }
+
+  }, 500);
+
+  break;
 
       case "takeDiscard":
 
-        showText(
-          "TAKE",
-          "#00ff88"
+  showText(
+    "TAKE",
+    "#00ff88"
+  );
+
+  animateCard(
+    document.getElementById("discard"),
+    actor.pending,
+    document.querySelector("#discard img")?.src
+  );
+
+  setTimeout(() => {
+
+    if (g.effect.player !== myId) {
+
+      const pendingCard =
+        document.getElementById(
+          "opponentPendingCard"
         );
 
-        animateCard(
-          document.getElementById("discard"),
-          actor.pending,
-          document
-            .querySelector("#discard img")
-            ?.src
-        );
+      if (pendingCard) {
+        pendingCard.style.display = "block";
+      }
 
-        break;
+    }
+
+  }, 500);
+
+  break;
 
       case "discard":
 
-        showText(
-          "DISCARD",
-          "#ff4444"
-        );
+  const pendingCard =
+    document.getElementById(
+      "opponentPendingCard"
+    );
 
-        animateCard(
-          actor.pending,
-          document.getElementById("discard"),
-          "/cards/back.png"
-        );
+  if (pendingCard) {
+    pendingCard.style.display = "none";
+  }
 
-        break;
+  showText(
+    "DISCARD",
+    "#ff4444"
+  );
+
+  animateCard(
+    actor.pending,
+    document.getElementById("discard"),
+    "/cards/back.png"
+  );
+
+  break;
 
 case "swap":
 
-handEl.classList.add("swapping");
+showText("SWAP", "#ffd000");
 
-setTimeout(()=>{
-  handEl.classList.remove("swapping");
-},400);
+const handSelector =
+  g.effect.player === myId
+    ? `#hand img[data-index="${g.effect.handIndex}"]`
+    : `#opponentHand img[data-oppindex="${g.effect.handIndex}"]`;
 
-  showText("SWAP", "#ffd000");
+const handEl = document.querySelector(handSelector);
 
-  const handSelector =
-    g.effect.player === myId
-      ? `#hand img[data-index="${g.effect.handIndex}"]`
-      : `#opponentHand img[data-oppindex="${g.effect.handIndex}"]`;
+if (handEl) {
 
-  const handEl = document.querySelector(handSelector);
+  handEl.classList.add("swapping");
+
+  setTimeout(() => {
+    handEl.classList.remove("swapping");
+  }, 400);
+
+}
 
   // 🔥 highlight target slot FIRST
  highlightCard(handEl,"#ffd000");
@@ -270,7 +315,18 @@ setTimeout(()=>{
 // ⬇️ ADD THIS DELAY
 setTimeout(()=>{
 
-  animateCard(actor.pending, handEl, "/cards/back.png");
+const source =
+  g.effect.player === myId
+    ? actor.pending
+    : document.getElementById(
+        "opponentPendingCard"
+      );
+
+animateCard(
+  source,
+  handEl,
+  "/cards/back.png"
+);
 
   setTimeout(()=>{
     animateCard(
@@ -281,19 +337,6 @@ setTimeout(()=>{
   },150);
 
 },200);
-
-  // 🔥 animate outgoing card → discard
-  setTimeout(() => {
-
-    animateCard(
-      handEl,
-      document.getElementById("discard"),
-      "/cards/back.png"
-    );
-
-  }, 200);
-
-  break;
 
         setTimeout(() => {
 
@@ -315,6 +358,36 @@ setTimeout(()=>{
         },300);
 
         break;
+        
+case "ghoulies":
+
+  showText(
+    "GHOULIES!",
+    "#ff4444"
+  );
+
+  document.body.classList.add(
+    "ghouliesFlash"
+  );
+
+  setTimeout(() => {
+
+    document.body.classList.remove(
+      "ghouliesFlash"
+    );
+
+  }, 500);
+
+  break;
+
+case "skip":
+
+  showText(
+    "TURN SKIPPED",
+    "#ff8800"
+  );
+
+  break;
 
       case "snapSuccess":
 
@@ -348,41 +421,41 @@ setTimeout(()=>{
 
 case "tenSwap":
 
-ownEl.classList.add("swapping");
-oppEl.classList.add("swapping");
+showText("SPECIAL 10", "gold");
 
-setTimeout(()=>{
-  ownEl.classList.remove("swapping");
-  oppEl.classList.remove("swapping");
-},400);
+const mine =
+  g.effect.player === myId;
 
-  showText("SPECIAL 10", "gold");
+const ownSelector =
+  mine
+    ? `#hand img[data-index="${g.effect.ownIndex}"]`
+    : `#opponentHand img[data-oppindex="${g.effect.ownIndex}"]`;
 
-  const mine =
-    g.effect.player === myId;
+const oppSelector =
+  mine
+    ? `#opponentHand img[data-oppindex="${g.effect.oppIndex}"]`
+    : `#hand img[data-index="${g.effect.oppIndex}"]`;
 
-  const ownSelector =
-    mine
-      ? `#hand img[data-index="${g.effect.ownIndex}"]`
-      : `#opponentHand img[data-oppindex="${g.effect.ownIndex}"]`;
+const ownEl = document.querySelector(ownSelector);
+const oppEl = document.querySelector(oppSelector);
 
-  const oppSelector =
-    mine
-      ? `#opponentHand img[data-oppindex="${g.effect.oppIndex}"]`
-      : `#hand img[data-index="${g.effect.oppIndex}"]`;
+if (ownEl) {
+  ownEl.classList.add("swapping");
 
-  const ownEl = document.querySelector(ownSelector);
-  const oppEl = document.querySelector(oppSelector);
+  setTimeout(() => {
+    ownEl.classList.remove("swapping");
+  }, 400);
+}
+
+if (oppEl) {
+  oppEl.classList.add("swapping");
+
+  setTimeout(() => {
+    oppEl.classList.remove("swapping");
+  }, 400);
+}
 highlightCard(ownEl,"#00ffcc");
 highlightCard(oppEl,"#ff00ff");
-
-// ⬇️ ADD DELAY HERE
-setTimeout(()=>{
-
-  animateCard(ownEl, oppEl, "/cards/back.png");
-  animateCard(oppEl, ownEl, "/cards/back.png");
-
-},250);
 
   // 🔥 delay so players SEE selection first
   setTimeout(() => {
@@ -401,7 +474,6 @@ setTimeout(()=>{
 
   }, 200);
 
-  break;
 
   break;
     }
