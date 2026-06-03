@@ -124,19 +124,26 @@ socket.on("state", g => {
         highlightCard(handEl, "#ffd000");
         if (handEl){
           handEl.classList.add("swapping");
-          setTimeout(() => handEl.classList.remove("swapping"), 450);
+          // Keep faded until the animation has fully landed
+          setTimeout(() => handEl.classList.remove("swapping"), 1000);
         }
 
         const source = isMe
           ? actor.pending
           : document.getElementById("opponentPendingCard");
 
+        // Stagger: first card arrives (~750ms), then second launches
+        // Slight delay before first so highlight is visible first
         setTimeout(() => {
           animateCard(source, handEl, "/cards/back.png");
-          setTimeout(() => animateCard(handEl, document.getElementById("discard"), "/cards/back.png"), 200);
-        }, 180);
+        }, 150);
 
-        setTimeout(() => pulseCard(handSelector), 320);
+        // Second animation launches after first has mostly landed
+        setTimeout(() => {
+          animateCard(handEl, document.getElementById("discard"), "/cards/back.png");
+        }, 700);
+
+        setTimeout(() => pulseCard(handSelector), 780);
         break;
       }
 
@@ -180,13 +187,14 @@ socket.on("state", g => {
         highlightCard(ownEl, "#00ffcc");
         highlightCard(oppEl, "#ff00ff");
 
-        if (ownEl){ ownEl.classList.add("swapping"); setTimeout(() => ownEl.classList.remove("swapping"), 450); }
-        if (oppEl){ oppEl.classList.add("swapping"); setTimeout(() => oppEl.classList.remove("swapping"), 450); }
+        if (ownEl){ ownEl.classList.add("swapping"); setTimeout(() => ownEl.classList.remove("swapping"), 1100); }
+        if (oppEl){ oppEl.classList.add("swapping"); setTimeout(() => oppEl.classList.remove("swapping"), 1100); }
 
+        // Both cards launch together after highlights are visible
         setTimeout(() => {
           animateCard(ownEl, oppEl, "/cards/back.png");
           animateCard(oppEl, ownEl, "/cards/back.png");
-        }, 200);
+        }, 300);
         break;
       }
     }
@@ -323,27 +331,68 @@ function centerOf(el){
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 }
 
+// ─── Card animation ───────────────────────────────────────────────────────
+// • compositor-only transform — no layout reflow, no jitter
+// • image is preloaded before measuring/launching so coordinates are accurate
+// • long ease-out curve mimics the physical feel of placing a card on a table
+// • subtle random end-rotation so repeated moves don't look robotic
+// • shadow lifts during flight then settles, giving a sense of physical depth
+
 function animateCard(fromEl, toEl, image){
   if (!fromEl || !toEl || !image) return;
+
   const fx    = document.getElementById("fxLayer");
   const start = centerOf(fromEl);
   const end   = centerOf(toEl);
-  const img   = document.createElement("img");
-  img.src       = image;
-  img.className = "flyingCard";
-  img.style.cssText = `
-    position:absolute; left:0; top:0; width:80px;
-    will-change:transform,opacity;
-    transform: translate(${start.x}px,${start.y}px) translate(-50%,-50%);
-  `;
-  fx.appendChild(img);
-  requestAnimationFrame(() => {
+
+  // Skip if positions are essentially the same (element off-screen / hidden)
+  if (Math.abs(start.x - end.x) < 2 && Math.abs(start.y - end.y) < 2) return;
+
+  const img = document.createElement("img");
+
+  img.onload = () => {
+    // Place card at source, invisible, no transition yet
+    img.style.cssText = `
+      position: absolute;
+      left: 0; top: 0;
+      width: 80px;
+      border-radius: 6px;
+      pointer-events: none;
+      will-change: transform, opacity, box-shadow;
+      opacity: 0;
+      transform: translate(${start.x}px, ${start.y}px) translate(-50%, -50%) rotate(0deg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      z-index: 9999;
+    `;
+    fx.appendChild(img);
+
+    // Paint frame 1: starting state visible
+    // Paint frame 2: begin transition to destination
     requestAnimationFrame(() => {
-      img.style.transition = "transform 0.55s cubic-bezier(0.22,0.61,0.36,1), opacity 0.55s ease";
-      img.style.transform  = `translate(${end.x}px,${end.y}px) translate(-50%,-50%) rotate(12deg)`;
+      requestAnimationFrame(() => {
+        const endAngle = (Math.random() * 10 - 5).toFixed(1);
+
+        img.style.transition = [
+          "transform  0.75s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+          "opacity    0.12s ease-out",
+          "box-shadow 0.75s ease-out"
+        ].join(", ");
+
+        img.style.opacity   = "1";
+        img.style.transform = `translate(${end.x}px, ${end.y}px) translate(-50%, -50%) rotate(${endAngle}deg)`;
+        img.style.boxShadow = "0 14px 30px rgba(0,0,0,0.6)";
+      });
     });
-  });
-  setTimeout(() => img.remove(), 650);
+
+    // Fade out at end of flight, then remove
+    setTimeout(() => {
+      img.style.transition = "opacity 0.15s ease-in";
+      img.style.opacity    = "0";
+      setTimeout(() => img.remove(), 160);
+    }, 720);
+  };
+
+  img.src = image;  // triggers preload; onload fires even when cached
 }
 
 function showText(text, color = "#fff"){
@@ -359,23 +408,39 @@ function showText(text, color = "#fff"){
 function pulseCard(selector){
   const el = document.querySelector(selector);
   if (!el) return;
-  el.style.transition = "box-shadow 0.2s, transform 0.2s";
-  el.style.boxShadow  = "0 0 30px #00ff88";
-  el.style.transform  = "scale(1.15)";
-  setTimeout(() => { el.style.boxShadow = ""; el.style.transform = ""; }, 700);
+  el.style.transition = "box-shadow 0.35s ease, transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94)";
+  el.style.boxShadow  = "0 0 28px #00ff88, 0 8px 20px rgba(0,0,0,0.5)";
+  el.style.transform  = "scale(1.12) translateY(-4px)";
+  setTimeout(() => {
+    el.style.transition = "box-shadow 0.5s ease, transform 0.5s ease";
+    el.style.boxShadow  = "";
+    el.style.transform  = "";
+  }, 650);
 }
 
 function highlightCard(el, color = "#00ff88"){
   if (!el) return;
-  el.style.transition = "outline 0.15s, box-shadow 0.15s, transform 0.15s";
-  el.style.outline    = `5px solid ${color}`;
-  el.style.boxShadow  = `0 0 22px ${color}`;
-  el.style.transform  = "scale(1.2) translateY(-10px)";
-  el.style.zIndex     = "10";
+  // Slow, deliberate glow-up — like someone pointing to a card on a table
+  el.style.transition = [
+    "outline   0.25s ease",
+    "box-shadow 0.25s ease",
+    "transform  0.3s cubic-bezier(0.25,0.46,0.45,0.94)"
+  ].join(", ");
+  el.style.outline   = `4px solid ${color}`;
+  el.style.boxShadow = `0 0 18px ${color}88, 0 8px 20px rgba(0,0,0,0.5)`;
+  el.style.transform = "scale(1.15) translateY(-8px)";
+  el.style.zIndex    = "10";
   setTimeout(() => {
-    el.style.outline = ""; el.style.boxShadow = "";
-    el.style.transform = ""; el.style.zIndex = "";
-  }, 950);
+    el.style.transition = [
+      "outline    0.4s ease",
+      "box-shadow 0.4s ease",
+      "transform  0.4s ease"
+    ].join(", ");
+    el.style.outline   = "";
+    el.style.boxShadow = "";
+    el.style.transform = "";
+    el.style.zIndex    = "";
+  }, 1100);
 }
 
 function showLastTurnWarning(){
