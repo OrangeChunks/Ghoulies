@@ -156,7 +156,7 @@ body{
   background: rgba(255,255,255,0.08);
   color: var(--txt);
   font-family: var(--font);
-  font-size: 20px;
+  font-size: 16px;   /* ≥16px prevents iOS zoom; letter-spacing keeps it large */
   font-weight: 700;
   letter-spacing: 6px;
   text-transform: uppercase;
@@ -349,12 +349,10 @@ body{
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  gap: -8px;   /* cards overlap like a fanned hand */
+  gap: 6px;
   min-height: calc(var(--card-h) + 12px);
   padding: 0 4px;
 }
-/* fan overlap */
-#opponentHand .card + .card{ margin-left: -14px; }
 
 /* ── table zone (deck + discard) ────────────────────────────────────────── */
 #tableZone{
@@ -437,13 +435,13 @@ body{
   display: flex;
   justify-content: center;
   align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
   min-height: calc(var(--card-h) + 12px);
   padding: 4px 4px 0;
   border-radius: 12px;
   transition: box-shadow 0.4s ease;
 }
-/* fan overlap */
-#hand .card + .card{ margin-left: -14px; }
 #hand.activeTurn{ box-shadow: 0 0 0 2px rgba(39,174,96,0.5), 0 0 20px rgba(39,174,96,0.2); }
 
 /* ── cards ──────────────────────────────────────────────────────────────── */
@@ -508,6 +506,43 @@ body{
 #resetBtn{ color: var(--txt-dim); font-size: 12px; }
 #restartBtn{ display:none; background: var(--safe); color: #fff; border-color: transparent; }
 #noSwapBtn{ display:none; }
+
+/* ── Special-10 prompt banner ────────────────────────────────────────────── */
+/* Shown ABOVE the player's hand when a tenSwap is in progress.               */
+/* Much more visible than a button buried in the action bar.                  */
+#tenSwapPrompt{
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin: 0 12px;
+  background: rgba(232,201,106,0.12);
+  border: 1px solid rgba(232,201,106,0.4);
+  border-radius: 14px;
+  text-align: center;
+}
+#tenSwapPrompt p{
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+#tenSwapSkipBtn{
+  padding: 10px 24px;
+  border-radius: 10px;
+  border: 1px solid rgba(232,201,106,0.5);
+  background: rgba(232,201,106,0.15);
+  color: var(--accent);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s, transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+#tenSwapSkipBtn:active{ background: rgba(232,201,106,0.3); transform: scale(0.96); }
 
 /* ── card animations ────────────────────────────────────────────────────── */
 
@@ -725,7 +760,7 @@ body{
   background: rgba(255,255,255,0.07);
   color: var(--txt);
   font-family: var(--font);
-  font-size: 14px;
+  font-size: 16px;   /* must be ≥16px — prevents iOS auto-zoom on focus */
   outline: none;
   -webkit-appearance: none;
 }
@@ -772,9 +807,6 @@ body{
 /* ── desktop tweaks ─────────────────────────────────────────────────────── */
 @media(min-width:640px){
   :root{ --card-w: 78px; --card-h: 110px; }
-
-  #hand .card + .card  { margin-left: -10px; }
-  #opponentHand .card + .card{ margin-left: -10px; }
 
   #chatDrawer{
     max-width: 380px;
@@ -909,6 +941,12 @@ body{
   <div id="pendingZone">
     <div id="pendingLabel">Picked Up</div>
     <div id="pending"></div>
+  </div>
+
+  <!-- Special-10 prompt — shown above hand during tenSwap selection -->
+  <div id="tenSwapPrompt">
+    <p id="tenSwapPromptText">Special 10 — choose a card to swap</p>
+    <button id="tenSwapSkipBtn">Skip Swap</button>
   </div>
 
   <!-- Player hand -->
