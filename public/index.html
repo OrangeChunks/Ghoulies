@@ -1,170 +1,198 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#3d6b4f"/>
 <title>Ghoulies</title>
 <style>
 
-/* ── reset / base ──────────────────────────────────────────────────────── */
-*, *::before, *::after { box-sizing: border-box; }
+/* ── tokens ─────────────────────────────────────────────────────────────── */
+:root{
+  --felt:      #4a7c59;
+  --felt-dark: #325444;
+  --felt-deep: #243d30;
+  --card-w:    68px;
+  --card-h:    96px;
+  --radius:    10px;
+  --ui-bg:     rgba(0,0,0,0.45);
+  --ui-border: rgba(255,255,255,0.12);
+  --txt:       #f0ede6;
+  --txt-dim:   rgba(240,237,230,0.55);
+  --accent:    #e8c96a;   /* warm gold — replaces neon */
+  --danger:    #c0392b;
+  --safe:      #27ae60;
+  --font:      -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ── reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after{ box-sizing:border-box; margin:0; padding:0; }
+
+html{ height:100%; }
 
 body{
-  margin:0;
-  /* Pastel green felt — like a card table */
-  background: radial-gradient(ellipse at center, #6b9e7a 0%, #4a7c59 45%, #35654a 100%);
-  color:#fff;
-  font-family: 'Arial', sans-serif;
-  min-height:100vh;
-  overflow-x:hidden;
+  font-family: var(--font);
+  background: radial-gradient(ellipse at 50% 30%, #5e9470, var(--felt) 55%, var(--felt-dark) 100%);
+  min-height: 100%;
+  min-height: 100dvh;
+  color: var(--txt);
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   LOBBY SCREEN
+   LOBBY
 ═══════════════════════════════════════════════════════════════════════════ */
 
 #lobbyScreen{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  min-height:100vh;
-  padding:24px;
-  gap:0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px 20px;
+  gap: 28px;
 }
 
-/* title */
 .lobbyTitle{
-  font-size:clamp(48px,10vw,88px);
-  font-weight:900;
-  letter-spacing:4px;
-  text-transform:uppercase;
-  color:#cc2200;
-  text-shadow:
-    0 0 30px #ff000088,
-    0 0 60px #ff000044,
-    2px 2px 0 #000;
-  margin:0 0 32px;
-  animation: titlePulse 3s ease-in-out infinite;
+  font-size: clamp(52px, 13vw, 96px);
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--danger);
+  text-shadow: 0 2px 0 rgba(0,0,0,0.5), 0 0 40px rgba(192,57,43,0.5);
+  line-height: 1;
+  animation: titleBreath 4s ease-in-out infinite;
+}
+@keyframes titleBreath{
+  0%,100%{ text-shadow: 0 2px 0 rgba(0,0,0,0.5), 0 0 30px rgba(192,57,43,0.4); }
+  50%    { text-shadow: 0 2px 0 rgba(0,0,0,0.5), 0 0 55px rgba(192,57,43,0.7); }
 }
 
-@keyframes titlePulse{
-  0%,100%{ text-shadow: 0 0 30px #ff000088, 0 0 60px #ff000044, 2px 2px 0 #000; }
-  50%    { text-shadow: 0 0 50px #ff0000cc, 0 0 100px #ff000066, 2px 2px 0 #000; }
-}
-
-/* lobby card */
 .lobbyCard{
-  background: rgba(0,0,0,0.35);
-  border:1px solid rgba(255,255,255,0.15);
-  border-radius:20px;
-  padding:32px 36px;
-  width:100%;
-  max-width:400px;
-  backdrop-filter:blur(8px);
-  display:flex;
-  flex-direction:column;
-  gap:16px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 380px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .lobbyDivider{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  color:#555;
-  font-size:13px;
-  letter-spacing:2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--txt-dim);
 }
 .lobbyDivider::before,
 .lobbyDivider::after{
-  content:"";
-  flex:1;
-  height:1px;
-  background:rgba(255,255,255,0.1);
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--ui-border);
 }
 
-/* lobby buttons */
-.btnPrimary{
-  padding:14px 20px;
-  border:none;
-  border-radius:12px;
-  font-size:16px;
-  font-weight:700;
-  cursor:pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-  letter-spacing:1px;
+/* buttons */
+.btn{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
-.btnPrimary:hover{ transform:scale(1.04); }
+.btn:active{ transform: scale(0.96); opacity: 0.9; }
 
-.btnCreate{
-  background: linear-gradient(135deg,#cc2200,#ff4400);
-  color:#fff;
-  box-shadow:0 4px 20px #cc220044;
+.btn-create{
+  background: var(--danger);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(192,57,43,0.35);
 }
-.btnCreate:hover{ box-shadow:0 6px 30px #cc220066; }
-
-.btnJoin{
-  background:linear-gradient(135px,#1a5c2e,#1e8c40);
-  background:linear-gradient(135deg,#1a5c2e,#1e8c40);
-  color:#fff;
-  box-shadow:0 4px 20px #1a5c2e44;
+.btn-join{
+  background: var(--safe);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(39,174,96,0.3);
+  flex-shrink: 0;
 }
-.btnJoin:hover{ box-shadow:0 6px 30px #1a5c2e66; }
-
-.btnGhost{
-  background:transparent;
-  color:#888;
-  border:1px solid rgba(255,255,255,0.15);
+.btn-ghost{
+  background: transparent;
+  color: var(--txt-dim);
+  border: 1px solid var(--ui-border);
 }
-.btnGhost:hover{ background:rgba(255,255,255,0.05); color:#fff; }
+.btn-ghost:active{ background: rgba(255,255,255,0.06); }
 
-/* join input row */
+/* join row — stacks vertically on small screens */
 .joinRow{
-  display:flex;
-  gap:8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+@media(min-width: 400px){
+  .joinRow{ flex-direction: row; }
+  .joinRow .btn-join{ width: auto; }
 }
 
 .codeInput{
-  flex:1;
-  padding:13px 16px;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,0.2);
-  background:rgba(255,255,255,0.07);
-  color:#fff;
-  font-size:18px;
-  font-weight:700;
-  letter-spacing:4px;
-  text-transform:uppercase;
-  text-align:center;
-  outline:none;
-  transition:border-color 0.2s;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--ui-border);
+  background: rgba(255,255,255,0.08);
+  color: var(--txt);
+  font-family: var(--font);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
 }
-.codeInput:focus{ border-color:#00ff88; }
-.codeInput::placeholder{ color:#555; letter-spacing:2px; font-weight:400; font-size:14px; }
+.codeInput:focus{ border-color: var(--accent); }
+.codeInput::placeholder{ color: rgba(255,255,255,0.25); letter-spacing: 2px; font-size: 13px; font-weight: 400; }
 
-.joinErrorMsg{
-  color:#ff4444;
-  font-size:13px;
-  display:none;
-  text-align:center;
+.joinError{
+  font-size: 13px;
+  color: #e74c3c;
+  text-align: center;
+  display: none;
 }
 
-/* room code display (shown while waiting) */
-.roomCodeBadge{
-  background:rgba(0,255,136,0.1);
-  border:1px solid rgba(0,255,136,0.3);
-  border-radius:10px;
-  padding:10px 16px;
-  font-size:13px;
-  color:#00ff88;
-  text-align:center;
-  display:none;
+.roomBadge{
+  background: rgba(39,174,96,0.12);
+  border: 1px solid rgba(39,174,96,0.35);
+  border-radius: 12px;
+  padding: 14px 18px;
+  text-align: center;
+  font-size: 13px;
+  color: #2ecc71;
+  display: none;
+  width: 100%;
+  max-width: 380px;
 }
-#roomCodeDisplay{
-  font-size:28px;
-  font-weight:900;
-  letter-spacing:8px;
-  display:block;
-  margin-top:4px;
+.roomBadge strong{
+  display: block;
+  font-size: 30px;
+  letter-spacing: 10px;
+  margin-top: 6px;
+  color: #fff;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -172,358 +200,594 @@ body{
 ═══════════════════════════════════════════════════════════════════════════ */
 
 #instructionsModal{
-  display:none;
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.85);
-  z-index:10000;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  z-index: 10000;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
 }
 
 .modalBox{
-  background:#1a2e1f;
-  border:1px solid rgba(255,255,255,0.15);
-  border-radius:20px;
-  padding:32px;
-  max-width:560px;
-  width:100%;
-  max-height:85vh;
-  overflow-y:auto;
-  position:relative;
+  background: #1e2e23;
+  border: 1px solid var(--ui-border);
+  border-radius: 18px;
+  padding: 28px 24px 24px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 88dvh;
+  overflow-y: auto;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
 }
-
-.modalBox h2{
-  margin:0 0 20px;
-  font-size:24px;
-  color:#cc2200;
-  text-align:center;
-  letter-spacing:2px;
-}
-
+.modalBox h2{ font-size: 20px; color: var(--danger); text-align: center; margin-bottom: 18px; }
 .modalBox h3{
-  color:#00ff88;
-  font-size:14px;
-  letter-spacing:2px;
-  text-transform:uppercase;
-  margin:20px 0 8px;
-  border-bottom:1px solid rgba(255,255,255,0.1);
-  padding-bottom:6px;
+  font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+  color: #2ecc71; margin: 18px 0 6px;
+  border-bottom: 1px solid var(--ui-border); padding-bottom: 5px;
 }
+.modalBox p, .modalBox li{ font-size: 14px; line-height: 1.65; color: #bbb; margin: 3px 0; }
+.modalBox ul{ padding-left: 18px; }
+.modalBox .hl{ color: var(--accent); font-weight: 600; }
 
-.modalBox p, .modalBox li{
-  font-size:14px;
-  line-height:1.7;
-  color:#ccc;
-  margin:4px 0;
+.cardGrid{
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 6px;
+  margin-top: 8px;
 }
-
-.modalBox ul{ padding-left:20px; }
-
-.cardValues{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:6px;
-  margin-top:8px;
+.cardGrid div{
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 6px;
+  font-size: 12px;
+  color: #ccc;
+  text-align: center;
 }
-
-.cvItem{
-  background:rgba(255,255,255,0.05);
-  border-radius:8px;
-  padding:6px 10px;
-  font-size:13px;
-  color:#ddd;
-  text-align:center;
-}
-.cvItem span{ color:#fff; font-weight:700; }
-
-.highlight{
-  color:#ffd000;
-  font-weight:700;
-}
+.cardGrid strong{ color: #fff; }
 
 .btnClose{
-  position:absolute;
-  top:16px; right:16px;
-  background:rgba(255,255,255,0.1);
-  border:none;
-  color:#fff;
-  width:32px; height:32px;
-  border-radius:50%;
-  font-size:18px;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  transition:background 0.15s;
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(255,255,255,0.1); border: none; color: #fff;
+  width: 30px; height: 30px; border-radius: 50%;
+  font-size: 16px; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  transition: background 0.15s;
 }
-.btnClose:hover{ background:rgba(255,255,255,0.2); }
+.btnClose:hover{ background: rgba(255,255,255,0.2); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   GAME SCREEN
+   GAME SCREEN  — mobile-first column layout
 ═══════════════════════════════════════════════════════════════════════════ */
 
 #gameScreen{
-  display:none;
-  flex-direction:column;
-  align-items:center;
-  min-height:100vh;
-  transition: background 0.4s;
+  display: none;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 100dvh;
+  /* safe areas for notched phones */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-.snapFlash    { background: radial-gradient(ellipse at center, #2d6e3a 0%, #1a4d2a 100%) !important; }
-.ghouliesFlash{ background: radial-gradient(ellipse at center, #6e2d2d 0%, #4d1a1a 100%) !important; }
+/* flash effects */
+.snapFlash    { background: #1a4d2e !important; }
+.ghouliesFlash{ background: #4d1a1a !important; }
 
-#status{
-  padding:12px;
-  font-size:22px;
-  font-weight:bold;
-  letter-spacing:1px;
-  text-shadow:0 0 10px #000;
-  transition: color 0.3s;
-  text-align:center;
-  width:100%;
+/* ── HUD bar (top) ──────────────────────────────────────────────────────── */
+#hud{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--ui-bg);
+  border-bottom: 1px solid var(--ui-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 #scores{
-  margin-bottom:12px;
-  font-size:18px;
-  text-align:center;
+  font-size: 13px;
+  color: var(--txt-dim);
+  white-space: nowrap;
+}
+#scores strong{ color: var(--txt); }
+
+#statusPill{
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--txt);
+  background: rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 5px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#statusPill.myTurn   { background: rgba(39,174,96,0.25);  color: #2ecc71; }
+#statusPill.oppTurn  { background: rgba(255,255,255,0.06); color: var(--txt-dim); }
+#statusPill.warning  { background: rgba(192,57,43,0.3);   color: #e74c3c; }
+
+/* chat toggle icon in HUD */
+#chatToggleBtn{
+  background: none; border: none; color: var(--txt-dim);
+  font-size: 20px; cursor: pointer; padding: 4px;
+  position: relative; flex-shrink: 0;
+  transition: color 0.2s;
+}
+#chatToggleBtn.hasUnread::after{
+  content: "";
+  position: absolute; top: 2px; right: 2px;
+  width: 8px; height: 8px;
+  background: var(--danger); border-radius: 50%;
 }
 
-.row{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:18px;
-  flex-wrap:wrap;
-  margin:16px;
+/* ── opponent zone ──────────────────────────────────────────────────────── */
+#opponentZone{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 8px 6px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
-#hand,
+#opponentLabel{
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--txt-dim);
+}
+
 #opponentHand{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:10px;
-  min-height:120px;
-  width:100%;
-  max-width:100vw;
-  padding:12px;
-  overflow-x:auto;
-  border-radius:16px;
-  transition: box-shadow 0.3s;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: -8px;   /* cards overlap like a fanned hand */
+  min-height: calc(var(--card-h) + 12px);
+  padding: 0 4px;
+}
+/* fan overlap */
+#opponentHand .card + .card{ margin-left: -14px; }
+
+/* ── table zone (deck + discard) ────────────────────────────────────────── */
+#tableZone{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 0;
+  flex-shrink: 0;
+  position: relative;
 }
 
+#tableLabel{
+  position: absolute;
+  bottom: -2px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--txt-dim);
+  opacity: 0.5;
+}
+
+.pile{
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
+}
+.pile:active{ transform: scale(0.95); }
+.pile img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* empty discard placeholder */
+#discard:empty{
+  border: 2px dashed rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.2);
+}
+
+/* pending card zone (picked up card) */
+#pendingZone{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  flex-shrink: 0;
+}
+
+#pendingLabel{
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+  display: none;
+}
+
+/* ── player zone ────────────────────────────────────────────────────────── */
+#playerZone{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 8px 8px;
+  gap: 6px;
+  flex: 1;
+}
+
+#playerLabel{
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--txt-dim);
+}
+
+#hand{
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  min-height: calc(var(--card-h) + 12px);
+  padding: 4px 4px 0;
+  border-radius: 12px;
+  transition: box-shadow 0.4s ease;
+}
+/* fan overlap */
+#hand .card + .card{ margin-left: -14px; }
+#hand.activeTurn{ box-shadow: 0 0 0 2px rgba(39,174,96,0.5), 0 0 20px rgba(39,174,96,0.2); }
+
+/* ── cards ──────────────────────────────────────────────────────────────── */
 .card{
-  width:70px;
-  border-radius:6px;
-  /* Slower, more deliberate hover — feels like picking up a physical card */
-  transition: transform 0.28s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-              box-shadow 0.28s ease,
-              opacity    0.28s ease;
-  cursor:pointer;
-  user-select:none;
-  will-change:transform;
-  /* Subtle drop shadow so cards feel raised from the table surface */
-  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: var(--radius);
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+  transition:
+    transform 0.25s cubic-bezier(0.25,0.46,0.45,0.94),
+    box-shadow 0.25s ease,
+    opacity    0.25s ease;
+  will-change: transform;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  object-fit: cover;
 }
-.card:hover{
-  transform: translateY(-10px) scale(1.07);
-  box-shadow: 0 10px 22px rgba(0,0,0,0.5);
-}
-.card.swapping{
-  opacity:0.18;
-  transform:scale(0.92);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+#hand .card:hover,
+#hand .card:focus{ transform: translateY(-10px); box-shadow: 0 10px 24px rgba(0,0,0,0.55); }
+.card.swapping{ opacity: 0.15; transform: scale(0.9); }
+.tenGlow{ box-shadow: 0 0 0 3px var(--accent), 0 0 18px rgba(232,201,106,0.6); }
+
+/* ── action bar ─────────────────────────────────────────────────────────── */
+#actionBar{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--ui-bg);
+  border-top: 1px solid var(--ui-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  /* clear safe-area at bottom */
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
 }
 
-.activeTurn{ box-shadow:0 0 32px #00ff88; }
-.tenGlow{ box-shadow:0 0 20px gold; border-radius:8px; }
-.bigCard{ width:90px; }
+.actionBtn{
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--ui-border);
+  background: rgba(255,255,255,0.07);
+  color: var(--txt);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+}
+.actionBtn:active{ transform: scale(0.94); background: rgba(255,255,255,0.12); }
 
-/* last-turn pulse */
+#ghouliesBtn{ border-color: rgba(192,57,43,0.5); color: #e74c3c; }
+#ghouliesBtn:active{ background: rgba(192,57,43,0.15); }
+
+#resetBtn{ color: var(--txt-dim); font-size: 12px; }
+#restartBtn{ display:none; background: var(--safe); color: #fff; border-color: transparent; }
+#noSwapBtn{ display:none; }
+
+/* ── card animations ────────────────────────────────────────────────────── */
+
+/* "lift" before flight: card scales up from its origin */
+@keyframes cardLift{
+  0%  { transform: translate(var(--sx),var(--sy)) translate(-50%,-50%) scale(1)   rotate(0deg); }
+  25% { transform: translate(var(--sx),var(--sy)) translate(-50%,-50%) scale(1.12) rotate(-2deg); }
+  100%{ transform: translate(var(--ex),var(--ey)) translate(-50%,-50%) scale(1)   rotate(var(--er)); }
+}
+
+.flyingCard{
+  position: absolute;
+  left: 0; top: 0;
+  pointer-events: none;
+  border-radius: var(--radius);
+  will-change: transform, opacity;
+}
+
+/* discard "land" — card arrives with slight bounce */
+.pop{
+  animation: cardLand 0.35s cubic-bezier(0.34,1.4,0.64,1);
+}
+@keyframes cardLand{
+  0%  { transform: scale(0.7) rotate(-4deg); opacity: 0.5; }
+  60% { transform: scale(1.06); }
+  100%{ transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.flip{
+  animation: flipIn 0.4s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+@keyframes flipIn{
+  0%  { transform: rotateY(90deg) scale(0.85); }
+  100%{ transform: rotateY(0deg)  scale(1); }
+}
+
+.deckShake{ animation: deckShake 0.28s ease; }
+@keyframes deckShake{
+  0%,100%{ transform: translateX(0); }
+  30%    { transform: translateX(-4px) rotate(-1deg); }
+  70%    { transform: translateX(4px)  rotate(1deg); }
+}
+
+/* last-turn warning */
 @keyframes lastTurnPulseAnim{
-  0%,100%{ box-shadow:0 0 0 #ff2222; }
-  50%    { box-shadow:0 0 40px #ff2222, 0 0 80px #ff000066; }
+  0%,100%{ box-shadow: 0 0 0 rgba(231,76,60,0); }
+  50%    { box-shadow: 0 0 30px rgba(231,76,60,0.7), 0 0 60px rgba(231,76,60,0.3); }
 }
-.lastTurnPulse{ animation: lastTurnPulseAnim 0.7s ease-in-out infinite; }
+.lastTurnPulse{ animation: lastTurnPulseAnim 0.65s ease-in-out infinite; }
 
 .lastTurnBanner{
-  position:absolute; left:50%; top:38%;
-  transform:translate(-50%,-50%) scale(0.4);
-  font-size:52px; font-weight:900;
-  color:#ff2222;
-  text-shadow:0 0 30px #ff0000,0 0 60px #ff000088;
-  letter-spacing:3px; white-space:nowrap;
-  animation: lastTurnPop 3.2s forwards;
-  pointer-events:none;
+  position: absolute; left: 50%; top: 36%;
+  transform: translate(-50%,-50%) scale(0.5);
+  font-size: 48px; font-weight: 900;
+  color: #e74c3c;
+  text-shadow: 0 0 30px rgba(231,76,60,0.8);
+  white-space: nowrap; pointer-events: none;
+  animation: lastTurnPop 3s forwards;
 }
 @keyframes lastTurnPop{
-  0%  { opacity:0; transform:translate(-50%,-50%) scale(0.4); }
-  12% { opacity:1; transform:translate(-50%,-50%) scale(1.15); }
+  0%  { opacity:0; transform:translate(-50%,-50%) scale(0.5); }
+  12% { opacity:1; transform:translate(-50%,-50%) scale(1.1); }
   20% { transform:translate(-50%,-50%) scale(1.0); }
-  75% { opacity:1; transform:translate(-50%,-50%) scale(1.0); }
-  100%{ opacity:0; transform:translate(-50%,-50%) scale(0.8); }
+  78% { opacity:1; }
+  100%{ opacity:0; transform:translate(-50%,-50%) scale(0.85); }
 }
 
-.pop{ animation:pop 0.22s cubic-bezier(0.22,0.61,0.36,1); }
-@keyframes pop{
-  0%  { transform:scale(0.55); }
-  65% { transform:scale(1.08); }
-  100%{ transform:scale(1); }
-}
-
-.flip{ animation:flipCard 0.45s cubic-bezier(0.22,0.61,0.36,1); }
-@keyframes flipCard{
-  0%  { transform:rotateY(90deg) scale(0.8); }
-  100%{ transform:rotateY(0deg)  scale(1); }
-}
-
-.deckShake{ animation:shake 0.3s ease; }
-@keyframes shake{
-  0%,100%{ transform:translateX(0); }
-  25%    { transform:translateX(-5px); }
-  75%    { transform:translateX(5px); }
-}
-
-#deck, #discard{
-  width:90px; height:120px;
-  border:2px solid white;
-  display:flex; align-items:center; justify-content:center;
-  background:#222;
-  cursor:pointer; border-radius:12px; overflow:hidden;
-  box-shadow:0 8px 18px rgba(0,0,0,0.5);
-  transition:transform 0.15s ease;
-}
-#deck:hover, #discard:hover{ transform:scale(1.05); }
-#deck img, #discard img{ width:100%; height:100%; object-fit:cover; }
-
-/* game buttons */
-button.gameBtn{
-  padding:12px 18px;
-  border:none; border-radius:10px;
-  cursor:pointer; font-size:16px; font-weight:bold;
-  background:#222; color:white;
-  transition:transform 0.15s ease, background 0.15s ease;
-}
-button.gameBtn:hover{ transform:scale(1.06); background:#333; }
-
-#ghouliesBtn      { background:#7a0000; }
-#ghouliesBtn:hover{ background:#aa0000; }
-#resetBtn         { background:#444; }
-#restartBtn       { display:none; background:#333; }
-
-/* fx layer */
+/* ── fx layer ───────────────────────────────────────────────────────────── */
 #fxLayer{
-  position:fixed; inset:0;
-  pointer-events:none; overflow:hidden;
-  z-index:9999;
-}
-
-/* .flyingCard styles are applied inline by animateCard() in game.js
-   so the card can be precisely positioned before any transition starts.
-   This rule just provides a sensible fallback. */
-.flyingCard{
-  position:absolute;
-  pointer-events:none;
-  border-radius:6px;
+  position: fixed; inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 9000;
 }
 
 .effectText{
-  position:absolute; left:50%; top:50%;
-  transform:translate(-50%,-50%);
-  font-size:44px; font-weight:bold;
-  animation:effectPop 1.1s forwards;
-  text-shadow:0 0 20px #000;
-  pointer-events:none;
+  position: absolute; left: 50%; top: 42%;
+  transform: translate(-50%,-50%);
+  font-size: 38px; font-weight: 800;
+  letter-spacing: 2px;
+  animation: effectPop 1.1s forwards;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  pointer-events: none;
 }
 @keyframes effectPop{
-  0%  { opacity:0; transform:translate(-50%,-50%) scale(0.4); }
-  18% { opacity:1; transform:translate(-50%,-50%) scale(1.25); }
-  35% { transform:translate(-50%,-50%) scale(1.0); }
-  78% { opacity:1; }
-  100%{ opacity:0; transform:translate(-50%,-50%) scale(0.9); }
+  0%  { opacity:0; transform:translate(-50%,-50%) scale(0.5); }
+  15% { opacity:1; transform:translate(-50%,-50%) scale(1.2); }
+  30% { transform:translate(-50%,-50%) scale(1.0); }
+  75% { opacity:1; }
+  100%{ opacity:0; transform:translate(-50%,-50%) scale(0.95); }
 }
 
+/* ── opponent pending (absolute, top-right) ─────────────────────────────── */
 #opponentPending{
-  position:absolute; top:20%; right:10%;
-  width:80px; height:120px;
+  position: fixed; top: 100px; right: 12px;
+  width: var(--card-w); height: var(--card-h);
+  z-index: 100;
+  pointer-events: none;
 }
 
-/* ── game-over overlay ───────────────────────────────────────────────── */
+/* ── game-over overlay ──────────────────────────────────────────────────── */
 #gameOverOverlay{
-  display:none;
-  position:fixed; inset:0;
-  z-index:9998;
-  align-items:center; justify-content:center;
-  flex-direction:column;
-  gap:20px;
-  padding:24px;
-  backdrop-filter:blur(4px);
-  animation:fadeInOverlay 0.5s ease;
+  display: none;
+  position: fixed; inset: 0;
+  z-index: 9500;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 28px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
-@keyframes fadeInOverlay{
-  from{ opacity:0; transform:scale(0.95); }
-  to  { opacity:1; transform:scale(1); }
-}
-
 #gameOverTitle{
-  font-size:clamp(48px,12vw,80px);
-  font-weight:900;
-  letter-spacing:3px;
-  text-shadow:0 0 40px currentColor;
-  animation:titlePop 0.6s cubic-bezier(0.22,0.61,0.36,1);
+  font-size: clamp(52px,14vw,88px);
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-shadow: 0 0 40px currentColor;
+  animation: titlePop 0.5s cubic-bezier(0.34,1.4,0.64,1);
 }
 @keyframes titlePop{
-  0%  { transform:scale(0.3) rotate(-5deg); opacity:0; }
-  70% { transform:scale(1.1) rotate(1deg); }
-  100%{ transform:scale(1)   rotate(0deg); opacity:1; }
+  0%  { transform:scale(0.4) rotate(-6deg); opacity:0; }
+  100%{ transform:scale(1)   rotate(0deg);  opacity:1; }
+}
+#gameOverDetail{ font-size:17px; color:#ccc; line-height:1.8; text-align:center; }
+.gameOverBtns{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHAT DRAWER
+═══════════════════════════════════════════════════════════════════════════ */
+
+#chatDrawer{
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 8000;
+  background: #1a2b1f;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 18px 18px 0 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 55dvh;
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.25,0.46,0.45,0.94);
+  /* clear safe-area */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+#chatDrawer.open{ transform: translateY(0); }
+
+#chatHeader{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid var(--ui-border);
+  flex-shrink: 0;
+}
+#chatHeader span{ font-size: 13px; font-weight: 600; letter-spacing: 1px; color: var(--txt-dim); text-transform: uppercase; }
+
+#closeChatBtn{
+  background: none; border: none; color: var(--txt-dim);
+  font-size: 20px; cursor: pointer; padding: 0 4px;
 }
 
-#gameOverDetail{
-  font-size:18px;
-  color:#ccc;
-  line-height:1.8;
-  text-align:center;
+#chatMessages{
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  -webkit-overflow-scrolling: touch;
 }
 
-.gameOverBtns{
-  display:flex; gap:14px; flex-wrap:wrap; justify-content:center;
+.chatMsg{
+  max-width: 75%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.chatMsg.mine{
+  align-self: flex-end;
+  background: rgba(39,174,96,0.25);
+  color: #d4f7e2;
+  border-bottom-right-radius: 4px;
+}
+.chatMsg.theirs{
+  align-self: flex-start;
+  background: rgba(255,255,255,0.1);
+  color: var(--txt);
+  border-bottom-left-radius: 4px;
+}
+.chatMsg.system{
+  align-self: center;
+  background: none;
+  color: var(--txt-dim);
+  font-size: 12px;
+  font-style: italic;
 }
 
-/* ── toast ───────────────────────────────────────────────────────────── */
+#chatInputRow{
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--ui-border);
+  flex-shrink: 0;
+}
+
+#chatInput{
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 22px;
+  border: 1px solid var(--ui-border);
+  background: rgba(255,255,255,0.07);
+  color: var(--txt);
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+  -webkit-appearance: none;
+}
+#chatInput::placeholder{ color: rgba(255,255,255,0.25); }
+#chatInput:focus{ border-color: rgba(255,255,255,0.3); }
+
+#chatSendBtn{
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--safe);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+#chatSendBtn:active{ transform: scale(0.9); }
+
+/* ── toast ──────────────────────────────────────────────────────────────── */
 #toast{
-  position:fixed;
-  bottom:24px; left:50%;
-  transform:translate(-50%, 20px);
-  background:rgba(30,30,30,0.95);
-  border:1px solid rgba(255,255,255,0.15);
-  border-radius:12px;
-  padding:12px 22px;
-  font-size:14px;
-  color:#ccc;
-  opacity:0;
-  pointer-events:none;
-  z-index:20000;
-  transition: opacity 0.4s ease, transform 0.4s ease;
-  text-align:center;
-  max-width:320px;
+  position: fixed;
+  bottom: 80px; left: 50%;
+  transform: translate(-50%, 16px);
+  background: rgba(20,20,20,0.95);
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 13px;
+  color: #ccc;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20000;
+  transition: opacity 0.35s, transform 0.35s;
+  text-align: center;
+  max-width: 300px;
+}
+#toast.show{
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
-/* ── mobile ──────────────────────────────────────────────────────────── */
-@media(max-width:600px){
-  .card   { width:55px; }
-  .bigCard{ width:75px; }
-  #deck, #discard{ width:72px; height:98px; }
-  button.gameBtn{ font-size:14px; padding:10px 14px; }
-  #status{ font-size:18px; }
-  .lastTurnBanner{ font-size:36px; }
-  .effectText    { font-size:32px; }
-  .modalBox{ padding:24px 18px; }
-  #gameOverTitle { font-size:48px; }
+/* ── desktop tweaks ─────────────────────────────────────────────────────── */
+@media(min-width:640px){
+  :root{ --card-w: 78px; --card-h: 110px; }
+
+  #hand .card + .card  { margin-left: -10px; }
+  #opponentHand .card + .card{ margin-left: -10px; }
+
+  #chatDrawer{
+    max-width: 380px;
+    left: auto;
+    right: 16px;
+    bottom: 16px;
+    border-radius: 18px;
+    border: 1px solid var(--ui-border);
+    max-height: 420px;
+  }
+
+  .lobbyCard{ padding: 32px 36px; }
+  .joinRow{ flex-direction: row; }
 }
 
 </style>
@@ -531,7 +795,7 @@ button.gameBtn:hover{ transform:scale(1.06); background:#333; }
 <body>
 
 <!-- ══════════════════════════════════════════════════════════════════════
-     LOBBY SCREEN
+     LOBBY
 ══════════════════════════════════════════════════════════════════════ -->
 <div id="lobbyScreen">
 
@@ -539,40 +803,30 @@ button.gameBtn:hover{ transform:scale(1.06); background:#333; }
 
   <div class="lobbyCard">
 
-    <button class="btnPrimary btnCreate" id="createRoomBtn">
-      🂡 &nbsp;Create New Room
+    <button class="btn btn-create" id="createRoomBtn">
+      Create Room
     </button>
 
     <div class="lobbyDivider">OR</div>
 
     <div class="joinRow">
-      <input
-        class="codeInput"
-        id="joinCodeInput"
-        maxlength="4"
-        placeholder="ROOM CODE"
-        autocomplete="off"
-        spellcheck="false"
-      >
-      <button class="btnPrimary btnJoin" id="joinRoomBtn" style="flex-shrink:0">
-        Join
-      </button>
+      <input class="codeInput" id="joinCodeInput"
+        maxlength="4" placeholder="Enter code"
+        autocomplete="off" spellcheck="false" autocapitalize="characters"/>
+      <button class="btn btn-join" id="joinRoomBtn">Join</button>
     </div>
 
-    <p class="joinErrorMsg" id="joinErrorMsg"></p>
+    <p class="joinError" id="joinErrorMsg"></p>
 
-    <div class="lobbyDivider" style="margin-top:4px"></div>
+    <div class="lobbyDivider"></div>
 
-    <button class="btnPrimary btnGhost" id="howToPlayBtn">
-      📖 &nbsp;How to Play
-    </button>
+    <button class="btn btn-ghost" id="howToPlayBtn">How to Play</button>
 
   </div>
 
-  <!-- shown once a room is created, before opponent joins -->
-  <div class="roomCodeBadge" id="roomCodeBadge" style="display:none;margin-top:20px;max-width:400px;width:100%">
-    Share this code with your opponent:<br>
-    <span id="roomCodeDisplay"></span>
+  <div class="roomBadge" id="roomCodeBadge">
+    Share this code with your opponent
+    <strong id="roomCodeDisplay"></strong>
   </div>
 
 </div>
@@ -583,44 +837,44 @@ button.gameBtn:hover{ transform:scale(1.06); background:#333; }
 <div id="instructionsModal">
   <div class="modalBox">
     <button class="btnClose" id="closeInstructionsBtn">✕</button>
-    <h2>🂱 How to Play Ghoulies</h2>
+    <h2>How to Play Ghoulies</h2>
 
-    <h3>🎯 Objective</h3>
-    <p>End each round with the <span class="highlight">lowest points possible</span>. The game ends when a player hits <span class="highlight">51+ points</span> — that player <strong>loses</strong>. If both exceed 51, the highest score loses.</p>
+    <h3>Objective</h3>
+    <p>End each round with the <span class="hl">lowest points</span>. The game ends when a player hits <span class="hl">51+ points</span> — that player <strong>loses</strong>. If both exceed 51, the highest score loses.</p>
 
-    <h3>🃏 Card Values</h3>
-    <div class="cardValues">
-      <div class="cvItem"><span>A</span> = 1 pt</div>
-      <div class="cvItem"><span>2–10</span> = face value</div>
-      <div class="cvItem"><span>J / Q</span> = 10 pts</div>
-      <div class="cvItem"><span>K (black)</span> = 10 pts</div>
-      <div class="cvItem"><span>K♥ / K♦</span> = <span style="color:#00ff88">0 pts!</span></div>
+    <h3>Card Values</h3>
+    <div class="cardGrid">
+      <div><strong>A</strong> = 1 pt</div>
+      <div><strong>2 – 10</strong> = face</div>
+      <div><strong>J / Q</strong> = 10 pts</div>
+      <div><strong>K ♠ / K ♣</strong> = 10 pts</div>
+      <div><strong>K ♥ / K ♦</strong> = <span style="color:#2ecc71">0 pts</span></div>
     </div>
 
-    <h3>🔄 Starting the Round</h3>
+    <h3>Starting a Round</h3>
     <ul>
-      <li>Each player starts with <strong>4 cards face-down</strong>.</li>
-      <li>You may secretly peek at <strong>2 of your own cards</strong> — then they go face-down again. You cannot check again.</li>
-      <li>One card is flipped face-up to start the <strong>discard pile</strong>. The rest form the <strong>draw pile</strong>.</li>
+      <li>4 cards each, face-down.</li>
+      <li>Peek at <strong>2 of your own</strong> — remember them, they go back down.</li>
+      <li>One card starts the discard pile.</li>
     </ul>
 
-    <h3>🔁 Your Turn</h3>
+    <h3>Your Turn</h3>
     <ul>
-      <li><strong>Draw</strong> from the deck <em>or</em> <strong>take</strong> the top discard.</li>
-      <li>Either <strong>swap</strong> the drawn card with one in your hand (the swapped-out card goes to the discard), <em>or</em> <strong>discard</strong> it directly.</li>
+      <li><strong>Draw</strong> from the deck or <strong>take</strong> the top discard.</li>
+      <li><strong>Swap</strong> it with a hand card, or <strong>discard</strong> it.</li>
     </ul>
 
-    <h3>⚡ Snap!</h3>
-    <p><strong>Double-click</strong> one of your cards at any time. If its value matches the top card on the discard pile, it snaps onto the pile — removing it from your hand. Miss? You skip your next turn.</p>
+    <h3>Snap!</h3>
+    <p><strong>Double-tap</strong> a hand card whose value matches the top discard to snap it off your hand. Miss? Skip a turn.</p>
 
-    <h3>🔟 Special 10</h3>
-    <p>When you <em>discard</em> a 10 (any suit) from your hand, you may <strong>swap any one of your cards with any one of your opponent's cards</strong>. Both cards stay face-down throughout.</p>
+    <h3>Special 10</h3>
+    <p>Discard a 10 from your hand to swap any of your cards with any of your opponent's — both stay face-down.</p>
 
-    <h3>👻 Call Ghoulies!</h3>
-    <p>If you think you have the lowest hand, click <strong>Call Ghoulies</strong>. Your opponent gets <strong>one final turn</strong>, then the round ends.</p>
+    <h3>Call Ghoulies!</h3>
+    <p>Think you have the lowest hand? Call it. Opponent gets one final turn.</p>
     <ul>
-      <li>If your hand <em>is</em> lower: you get a <strong>−5 bonus</strong>.</li>
-      <li>If your hand <em>isn't</em> lower: you get a <strong>+5 penalty</strong>.</li>
+      <li>Your hand IS lower → <span class="hl">−5 bonus</span></li>
+      <li>Your hand is NOT lower → <span style="color:#e74c3c">+5 penalty</span></li>
     </ul>
   </div>
 </div>
@@ -630,55 +884,86 @@ button.gameBtn:hover{ transform:scale(1.06); background:#333; }
 ══════════════════════════════════════════════════════════════════════ -->
 <div id="gameScreen">
 
-  <div id="status"></div>
-  <div id="scores"></div>
+  <!-- HUD -->
+  <div id="hud">
+    <div id="scores"></div>
+    <div id="statusPill"></div>
+    <button id="chatToggleBtn" title="Chat">💬</button>
+  </div>
 
-  <button class="gameBtn" id="restartBtn">Play Again</button>
+  <!-- Opponent -->
+  <div id="opponentZone">
+    <div id="opponentLabel">Opponent</div>
+    <div id="opponentHand"></div>
+  </div>
 
-  <!-- opponent -->
+  <!-- Table -->
+  <div id="tableZone">
+    <div class="pile" id="deck">
+      <img src="/cards/back.png" alt="Deck">
+    </div>
+    <div class="pile" id="discard"></div>
+  </div>
+
+  <!-- Pending (picked-up card) -->
+  <div id="pendingZone">
+    <div id="pendingLabel">Picked Up</div>
+    <div id="pending"></div>
+  </div>
+
+  <!-- Player hand -->
+  <div id="playerZone">
+    <div id="playerLabel">Your Hand</div>
+    <div id="hand"></div>
+  </div>
+
+  <!-- Action bar -->
+  <div id="actionBar">
+    <button class="actionBtn" id="ghouliesBtn">👻 Ghoulies</button>
+    <button class="actionBtn" id="noSwapBtn">No Swap</button>
+    <button class="actionBtn" id="restartBtn">Play Again</button>
+    <button class="actionBtn" id="resetBtn">Reset</button>
+  </div>
+
+  <!-- Opponent pending (absolute) -->
   <div id="opponentPending">
     <img id="opponentPendingCard" class="card" src="/cards/back.png" style="display:none;">
   </div>
-  <div id="opponentHand"></div>
 
-  <!-- centre -->
-  <div class="row">
-    <div id="deck"><img src="/cards/back.png" alt="Deck"></div>
-    <div id="discard"></div>
-  </div>
-
-  <!-- player -->
-  <div id="hand"></div>
-  <div id="pending"></div>
-
-  <!-- actions -->
-  <div class="row">
-    <button class="gameBtn" id="ghouliesBtn">Call Ghoulies</button>
-    <button class="gameBtn" id="noSwapBtn" style="display:none;">No Swap</button>
-    <button class="gameBtn" id="resetBtn">Reset Game</button>
-  </div>
-
+  <!-- FX layer -->
   <div id="fxLayer"></div>
 
-  <!-- game-over overlay -->
+  <!-- Game-over overlay -->
   <div id="gameOverOverlay">
     <div id="gameOverTitle"></div>
     <div id="gameOverDetail"></div>
     <div class="gameOverBtns">
-      <button class="btnPrimary btnCreate" id="playAgainBtn">▶ Play Again</button>
-      <button class="btnPrimary btnGhost"  id="mainMenuBtn" >← Main Menu</button>
+      <button class="btn btn-create" id="playAgainBtn">Play Again</button>
+      <button class="btn btn-ghost"  id="mainMenuBtn">Main Menu</button>
     </div>
   </div>
 
 </div>
 
-<!-- toast -->
+<!-- Chat drawer -->
+<div id="chatDrawer">
+  <div id="chatHeader">
+    <span>Chat</span>
+    <button id="closeChatBtn">✕</button>
+  </div>
+  <div id="chatMessages"></div>
+  <div id="chatInputRow">
+    <input id="chatInput" type="text" placeholder="Message…" maxlength="200" autocomplete="off"/>
+    <button id="chatSendBtn">↑</button>
+  </div>
+</div>
+
+<!-- Toast -->
 <div id="toast"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="game.js"></script>
 
-<!-- show room code badge once room is created -->
 <script>
   document.getElementById("createRoomBtn").addEventListener("click", () => {
     document.getElementById("roomCodeBadge").style.display = "block";

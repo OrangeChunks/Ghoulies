@@ -398,6 +398,16 @@ io.on("connection", socket => {
     io.to(code).emit("forceReload");
   });
 
+  // ── chat ──────────────────────────────────────────────────────────────────
+  socket.on("chatMsg", text => {
+    const code = roomId(socket);
+    if (!code) return;
+    if (typeof text !== "string") return;
+    const safe = text.trim().slice(0, 200);
+    if (!safe) return;
+    io.to(code).emit("chatMsg", { from: socket.id, text: safe });
+  });
+
   socket.on("disconnect", () => {
     const code = roomId(socket);
     if (!code) return;
