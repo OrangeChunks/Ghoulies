@@ -84,6 +84,11 @@ function sendChat(){
   input.value = "";
 }
 
+// tenSwap skip button — same as the old noSwapBtn but much more visible
+document.getElementById("tenSwapSkipBtn").addEventListener("click", () => {
+  socket.emit("tenOwn", null);
+});
+
 document.getElementById("chatToggleBtn").addEventListener("click", () => chatOpen ? closeChat() : openChat());
 document.getElementById("closeChatBtn").addEventListener("click", closeChat);
 document.getElementById("chatSendBtn").addEventListener("click", sendChat);
@@ -582,6 +587,7 @@ function render(){
     document.getElementById("pendingLabel").style.display = "none";
     document.getElementById("noSwapBtn").style.display   = "none";
     document.getElementById("restartBtn").style.display  = "none";
+    document.getElementById("tenSwapPrompt").style.display = "none";
     return;
   }
 
@@ -658,10 +664,27 @@ function render(){
   const opc = document.getElementById("opponentPendingCard");
   if (opc) opc.style.display = !!(state.players?.[oppId()]?.pending) ? "block" : "none";
 
-  // ── buttons ───────────────────────────────────────────────────────────
-  document.getElementById("noSwapBtn").style.display =
-    (state.tenSwap && state.tenSwap.player === myId && state.tenSwap.selectingOwn)
-      ? "inline-flex" : "none";
+  // ── Special-10 prompt banner ─────────────────────────────────────────
+  const tenSwapPrompt = document.getElementById("tenSwapPrompt");
+  const tenSwapText   = document.getElementById("tenSwapPromptText");
+  const myTenSwap     = state.tenSwap && state.tenSwap.player === myId;
+
+  if (myTenSwap){
+    tenSwapPrompt.style.display = "flex";
+    if (state.tenSwap.selectingOwn){
+      tenSwapText.textContent    = "Special 10 — tap one of your cards to swap";
+      // Show skip button only when selecting own card (first step)
+      document.getElementById("tenSwapSkipBtn").style.display = "inline-block";
+    } else {
+      tenSwapText.textContent    = "Now tap your opponent's card to swap with";
+      document.getElementById("tenSwapSkipBtn").style.display = "none";
+    }
+  } else {
+    tenSwapPrompt.style.display = "none";
+  }
+
+  // Legacy noSwapBtn hidden — tenSwapSkipBtn takes over
+  document.getElementById("noSwapBtn").style.display = "none";
   document.getElementById("restartBtn").style.display = state.gameOver ? "inline-flex" : "none";
 }
 
@@ -686,7 +709,7 @@ document.addEventListener("click", e => {
     return;
   }
 
-  if (e.target.id === "noSwapBtn"){ socket.emit("tenOwn", null); return; }
+  if (e.target.id === "noSwapBtn" || e.target.id === "tenSwapSkipBtn"){ socket.emit("tenOwn", null); return; }
 
   if (state.tenSwap && state.tenSwap.player === myId && state.tenSwap.selectingOwn
       && e.target.dataset.index !== undefined){
